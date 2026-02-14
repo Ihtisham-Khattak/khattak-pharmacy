@@ -7,6 +7,7 @@ $(document).ready(function () {
    * @param {string} value - The keypad value to be processed.
    * @param {boolean} isDueInput - Indicates whether the input is for due payment.
    */
+
   $.fn.keypadBtnPressed = function (value, isDueInput) {
     let paymentAmount = $("#payment").val();
     if (isDueInput) {
@@ -22,6 +23,7 @@ $(document).ready(function () {
   /**
    * Format payment amount with commas when a point is pressed
    */
+
   $.fn.digits = function () {
     let paymentAmount = $("#payment").val();
     $("#paymentText").val(utils.moneyFormat(paymentAmount));
@@ -32,6 +34,7 @@ $(document).ready(function () {
   /**
    * Calculate and display the balance due.
    */
+  debugger;
   $.fn.calculateChange = function () {
     var payablePrice = $("#payablePrice").val().replace(",", "");
     var payment = $("#payment").val().replace(",", "");
@@ -44,59 +47,61 @@ $(document).ready(function () {
       $("#confirmPayment").hide();
     }
   };
-
+  debugger;
   var $keypadBtn = $(".keypad-btn").on("click", function () {
     const key = $(this).data("val");
     const isdue = $(this).data("isdue");
-    switch(key)
-    {
-    case "del" : { 
-      if(isdue)
-      {
-        $('#refNumber').val((i, val) => val.slice(0, -1));
-      }
-      else
-      {
-        $("#payment").val((i, val) => val.slice(0, -1));
-      //re-format displayed amount after deletion 
-      $("#paymentText").val((i, val) => utils.moneyFormat($("#payment").val()));
-      }
-      $(this).calculateChange()
-    }; break;
+    switch (key) {
+      case "del":
+        {
+          if (isdue) {
+            $("#refNumber").val((i, val) => val.slice(0, -1));
+          } else {
+            $("#payment").val((i, val) => val.slice(0, -1));
+            //re-format displayed amount after deletion
+            $("#paymentText").val((i, val) =>
+              utils.moneyFormat($("#payment").val()),
+            );
+          }
+          $(this).calculateChange();
+        }
+        break;
 
-    case "ac":{
-      if(isdue)
-      {
-          $('#refNumber').val('');
-      }
-      else
-      {
-        $('#payment,#paymentText').val('');
-        $(this).calculateChange();
-      }
-       
-    };break;
+      case "ac":
+        {
+          if (isdue) {
+            $("#refNumber").val("");
+          } else {
+            $("#payment,#paymentText").val("");
+            $(this).calculateChange();
+          }
+        }
+        break;
 
-  case "point": {
-    $(this).digits()
-    };break;
+      case "point":
+        {
+          $(this).digits();
+        }
+        break;
 
-   default: $(this).keypadBtnPressed(key, isdue); break;
-  }
-});
-
-  /** Switch Views for Payment Options **/
-  var $list = $(".list-group-item").on("click", function () {
-    $list.removeClass("active");
-    $(this).addClass("active");
-    if (this.id == "check") {
-      $("#cardInfo").show();
-      $("#cardInfo .input-group-addon").text("Check Info");
-    } else if (this.id == "card") {
-      $("#cardInfo").show();
-      $("#cardInfo .input-group-addon").text("Card Info");
-    } else if (this.id == "cash") {
-      $("#cardInfo").hide();
+      default:
+        $(this).keypadBtnPressed(key, isdue);
+        break;
     }
   });
+
+  /** Switch Views for Payment Options **/
+  // var $list = $(".list-group-item").on("click", function () {
+  //   $list.removeClass("active");
+  //   $(this).addClass("active");
+  //   if (this.id == "check") {
+  //     $("#cardInfo").show();
+  //     $("#cardInfo .input-group-addon").text("Check Info");
+  //   } else if (this.id == "card") {
+  //     $("#cardInfo").show();
+  //     $("#cardInfo .input-group-addon").text("Card Info");
+  //   } else if (this.id == "cash") {
+  //     $("#cardInfo").hide();
+  //   }
+  // });
 });

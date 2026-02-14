@@ -141,17 +141,58 @@
   .logo span {
     display: none !important;
   }
-  .content-page {
-    margin-left: 70px;
-  }
-  .forced .side-menu.left {
-    box-shadow: 0 12px 12px rgba(0, 0, 0, 0.1);
-  }
-  .enlarged .side-menu.left {
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1) !important;
-  }
   .conversation-list .conversation-text,
   .conversation-list .odd .conversation-text {
     width: 100% !important;
+  }
+}
+
+@media (max-width: 991px) {
+  .col-md-6, .col-md-4, .col-md-8, .col-md-3 {
+    width: 100% !important;
+    float: none !important;
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 767px) {
+  body {
+    overflow-x: hidden;
+    padding-top: 10px;
+  }
+  .container {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .button-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-left: 0;
+  }
+  .button-list .btn {
+    flex: 1 1 40%;
+    margin: 5px;
+  }
+  .card-box {
+    padding: 15px;
+  }
+  #cartTable .row > div {
+    margin-bottom: 5px;
+  }
+  .btn-label {
+    display: none; /* Hide labels in buttons on mobile to save space */
+  }
+  .btn i {
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .button-list .btn {
+    flex: 1 1 100%;
+  }
+  h1, h2, h3 {
+    font-size: 1.5rem;
   }
 }

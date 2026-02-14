@@ -1,6 +1,5 @@
 const jsPDF = require("jspdf");
 const html2canvas = require("html2canvas");
-const JsBarcode = require("jsbarcode");
 const macaddress = require("macaddress");
 const notiflix = require("notiflix");
 const validator = require("validator");
@@ -68,7 +67,7 @@ let end_date = moment(end).toDate();
 let by_till = 0;
 let by_user = 0;
 let by_status = 1;
-const default_item_img = path.join("assets","images","default.jpg");
+const default_item_img = path.join("assets", "images", "default.jpg");
 const permissions = [
   "perm_products",
   "perm_categories",
@@ -78,10 +77,13 @@ const permissions = [
 ];
 notiflix.Notify.init({
   position: "right-top",
-  cssAnimationDuration: 600,
+  timeout: 5000,
+  cssAnimationDuration: 400,
   messageMaxLength: 150,
   clickToClose: true,
-  closeButton: true
+  closeButton: true,
+  useIcon: true,
+  showOnlyTheLastOne: true,
 });
 const {
   DATE_FORMAT,
@@ -140,6 +142,29 @@ $(function () {
 
   cb(start, end);
 
+  function renderPagination(total, limit, page, type, container) {
+    let pages = Math.ceil(total / limit);
+    let html =
+      '<div class="row"><div class="col-md-12"><div class="text-center"><ul class="pagination pagination-sm">';
+    let prev = page - 1;
+    let next = page + 1;
+    let disabledPrev = page == 1 ? "disabled" : "";
+    let disabledNext = page >= pages ? "disabled" : "";
+
+    if (pages > 1) {
+      html += `<li class="${disabledPrev}"><a href="#" class="pagination-btn" data-func="${type}" data-page="${prev}">Previous</a></li>`;
+      html += `<li class="active"><a href="#">Page ${page} of ${pages}</a></li>`;
+      html += `<li class="${disabledNext}"><a href="#" class="pagination-btn" data-func="${type}" data-page="${next}">Next</a></li>`;
+    }
+
+    html += "</ul></div></div></div>";
+
+    $(container).parent().find(".pagination-container").remove();
+    $(container)
+      .parent()
+      .append(`<div class="pagination-container">${html}</div>`);
+  }
+
   $("#expirationDate").daterangepicker({
     singleDatePicker: true,
     locale: {
@@ -149,21 +174,30 @@ $(function () {
 });
 
 //Allow only numbers in input field
-$.fn.allowOnlyNumbers = function() {
-  return this.on('keydown', function(e) {
-  // Allow: backspace, delete, tab, escape, enter, ., ctrl/cmd+A, ctrl/cmd+C, ctrl/cmd+X, ctrl/cmd+V, end, home, left, right, down, up
-    if ($.inArray(e.keyCode, [46, 8, 9, 27, 13, 110, 190]) !== -1 || 
-      (e.keyCode >= 35 && e.keyCode <= 40) || 
-      ((e.keyCode === 65 || e.keyCode === 67 || e.keyCode === 86 || e.keyCode === 88) && (e.ctrlKey === true || e.metaKey === true))) {
+$.fn.allowOnlyNumbers = function () {
+  return this.on("keydown", function (e) {
+    // Allow: backspace, delete, tab, escape, enter, ., ctrl/cmd+A, ctrl/cmd+C, ctrl/cmd+X, ctrl/cmd+V, end, home, left, right, down, up
+    if (
+      $.inArray(e.keyCode, [46, 8, 9, 27, 13, 110, 190]) !== -1 ||
+      (e.keyCode >= 35 && e.keyCode <= 40) ||
+      ((e.keyCode === 65 ||
+        e.keyCode === 67 ||
+        e.keyCode === 86 ||
+        e.keyCode === 88) &&
+        (e.ctrlKey === true || e.metaKey === true))
+    ) {
       return;
-  }
-  // Ensure that it is a number and stop the keypress
-  if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
-    e.preventDefault();
-  }
-});
+    }
+    // Ensure that it is a number and stop the keypress
+    if (
+      (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+      (e.keyCode < 96 || e.keyCode > 105)
+    ) {
+      e.preventDefault();
+    }
+  });
 };
-$('.number-input').allowOnlyNumbers();
+$(".number-input").allowOnlyNumbers();
 
 //Serialize Object
 $.fn.serializeObject = function () {
@@ -217,7 +251,9 @@ if (auth == undefined) {
 
   $(document).ready(function () {
     //update title based on company
-    let appTitle = !!settings ? `${validator.unescape(settings.store)} - ${appName}` : appName;
+    let appTitle = !!settings
+      ? `${validator.unescape(settings.store)} - ${appName}`
+      : appName;
     $("title").text(appTitle);
 
     $(".loading").hide();
@@ -226,8 +262,39 @@ if (auth == undefined) {
     loadProducts();
     loadCustomers();
 
+    // Pagination Click Handler
+    $(document).on("click", ".pagination-btn", function (e) {
+      e.preventDefault();
+      let func = $(this).data("func");
+      let page = $(this).data("page");
+      if (func === "loadProducts") loadProducts(page);
+      else if (func === "loadProductList") loadProductList(page);
+      else if (func === "loadCategoryList") loadCategoryList(page);
+      else if (func === "loadUserList") loadUserList(page);
+    });
+
+    // Search Handler
+    let searchTimeout;
+    $("#search").on("input", function () {
+      clearTimeout(searchTimeout);
+      let query = $(this).val();
+      searchTimeout = setTimeout(() => {
+        loadProducts(1, query);
+      }, 300);
+    });
+
+    $("#searchProductList").on("input", function () {
+      clearTimeout(searchTimeout);
+      let query = $(this).val();
+      searchTimeout = setTimeout(() => {
+        loadProductList(1, query);
+      }, 300);
+    });
+
     if (settings && validator.unescape(settings.symbol)) {
-      $("#price_curr, #payment_curr, #change_curr").text(validator.unescape(settings.symbol));
+      $("#price_curr, #payment_curr, #change_curr").text(
+        validator.unescape(settings.symbol),
+      );
     }
 
     setTimeout(function () {
@@ -263,15 +330,22 @@ if (auth == undefined) {
       $(".p_five").hide();
     }
 
-    function loadProducts() {
-      $.get(api + "inventory/products", function (data) {
-        data.forEach((item) => {
-          item.price = parseFloat(item.price).toFixed(2);
-        });
+    function loadProducts(page = 1, query = "") {
+      let limit = 10;
+      let url = api + "inventory/products?page=" + page + "&limit=" + limit;
+      if (query != "") url += "&q=" + query;
+
+      $.get(url, function (response) {
+        let data = response.data;
+        let total = response.total;
+
+        // data.forEach((item) => {
+        //   item.price = parseFloat(item.price).toFixed(2);
+        // });
 
         allProducts = [...data];
 
-        loadProductList();
+        // loadProductList(); // Don't reload list view every time
 
         let delay = 0;
         let expiredCount = 0;
@@ -293,68 +367,66 @@ if (auth == undefined) {
           }
         });
 
-        //Show notification if there are any expired goods.
-        if(expiredCount>0)
-        {
-           notiflix.Notify.failure(
-          `${expiredCount} ${
-            expiredCount > 0 ? "products" : "product"
-          } expired. Please restock!`,
-        );
+        //Show notification if there are any expired goods. (Only on first page load?)
+        if (expiredCount > 0 && page == 1 && query == "") {
+          notiflix.Notify.failure(
+            `${expiredCount} ${
+              expiredCount > 0 ? "products" : "product"
+            } expired. Please restock!`,
+          );
         }
 
-       
-        $("#parent").text("");
+        $("#parent").empty();
+        $("#parent").append(
+          `<div class="col-md-12">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Generic</th>
+                        <th>Product Name</th>
+                        <th>Price</th>
+                        <th>Stock</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="pos_product_list"></tbody>
+            </table>
+        </div>`,
+        );
 
         data.forEach((item) => {
           if (!categories.includes(item.category)) {
             categories.push(item.category);
           }
-          let item_isExpired = isExpired(item.expirationDate);
-          let item_stockStatus = getStockStatus(item.quantity,item.minStock);
-          if(item.img==="")
-          {
-            item_img = default_item_img;
-          }
-          else
-          {
-            item_img = path.join(img_path, item.img);
-            item_img = checkFileExists(item_img) ? item_img : default_item_img;
-          }
-          
 
-          let item_info = `<div class="col-lg-2 box ${item.category}"
-                                onclick="$(this).addToCart(${item._id}, ${
-                                  item.quantity
-                                }, ${item.stock})">
-                            <div class="widget-panel widget-style-2 " title="${item.name}">                    
-                            <div id="image"><img src="${item_img}" id="product_img" alt=""></div>                    
-                                        <div class="text-muted m-t-5 text-center">
-                                        <div class="name" id="product_name"><span class="${
-                                          item_isExpired ? "text-danger" : ""
-                                        }">${item.name}</span></div> 
-                                        <span class="sku">${
-                                          item.barcode || item._id
-                                        }</span>
-                                        <span class="${item_stockStatus<1?'text-danger':''}"><span class="stock">STOCK </span><span class="count">${
-                                          item.stock == 1
-                                            ? item.quantity
-                                            : "N/A"
-                                        }</span></span></div>
-                                        <span class="text-success text-center"><b data-plugin="counterup">${
-                                          validator.unescape(settings.symbol) +
-                                          moneyFormat(item.price)
-                                        }</b> </span>
-                            </div>
-                        </div>`;
-          $("#parent").append(item_info);
+          let item_isExpired = isExpired(item.expirationDate);
+          let item_stockStatus = getStockStatus(item.quantity, item.minStock);
+
+          let row = `<tr>
+              <td>${item.generic && item.generic !== "undefined" ? item.generic : item.name}</td>
+              <td><span class="${item_isExpired ? "text-danger" : ""}">${item.name}</span> <br><small class="sku">${item._id}</small></td>
+              <td>${validator.unescape(settings.symbol) + moneyFormat(item.price)}</td>
+              <td>
+                  <span class="${item_stockStatus < 1 ? "text-danger" : ""}">${
+                    item.stock == 1 ? item.quantity : "N/A"
+                  }</span>
+              </td>
+              <td>
+                  <button class="btn btn-primary btn-sm" onclick="$(this).addToCart(${item._id}, ${item.quantity}, ${item.stock})">
+                      <i class="fa fa-shopping-cart"></i> Add
+                  </button>
+              </td>
+          </tr>`;
+          $("#pos_product_list").append(row);
         });
+
+        renderPagination(total, limit, page, "loadProducts", "#parent");
       });
     }
 
     function loadCategories() {
-      $.get(api + "categories/all", function (data) {
-        allCategories = data;
+      $.get(api + "categories/all?limit=1000", function (data) {
+        allCategories = data.data;
         loadCategoryList();
         $("#category,#categories").html(`<option value="0">Select</option>`);
         allCategories.forEach((category) => {
@@ -402,94 +474,6 @@ if (auth == undefined) {
       });
     };
 
-    function barcodeSearch(e) {
-      e.preventDefault();
-      let searchBarCodeIcon = $(".search-barcode-btn").html();
-      $(".search-barcode-btn").empty();
-      $(".search-barcode-btn").append(
-        $("<i>", { class: "fa fa-spinner fa-spin" }),
-      );
-
-      let req = {
-        skuCode: $("#skuCode").val(),
-      };
-
-      $.ajax({
-        url: api + "inventory/product/sku",
-        type: "POST",
-        data: JSON.stringify(req),
-        contentType: "application/json; charset=utf-8",
-        cache: false,
-        processData: false,
-        success: function (product) {
-          $(".search-barcode-btn").html(searchBarCodeIcon);
-          const expired = isExpired(product.expirationDate);
-          if (product._id != undefined && product.quantity >= 1 && !expired) {
-            $(this).addProductToCart(product);
-            $("#searchBarCode").get(0).reset();
-            $("#basic-addon2").empty();
-            $("#basic-addon2").append(
-              $("<i>", { class: "glyphicon glyphicon-ok" }),
-            );
-          } else if (expired) {
-            notiflix.Report.failure(
-              "Expired!",
-              `${product.name} is expired`,
-              "Ok",
-            );
-          } else if (product.quantity < 1) {
-            notiflix.Report.info(
-              "Out of stock!",
-              "This item is currently unavailable",
-              "Ok",
-            );
-          } else {
-            notiflix.Report.warning(
-              "Not Found!",
-              "<b>" + $("#skuCode").val() + "</b> is not a valid barcode!",
-              "Ok",
-            );
-
-            $("#searchBarCode").get(0).reset();
-            $("#basic-addon2").empty();
-            $("#basic-addon2").append(
-              $("<i>", { class: "glyphicon glyphicon-ok" }),
-            );
-          }
-        },
-        error: function (err) {
-          if (err.status === 422) {
-            $(this).showValidationError(data);
-            $("#basic-addon2").append(
-              $("<i>", { class: "glyphicon glyphicon-remove" }),
-            );
-          } else if (err.status === 404) {
-            $("#basic-addon2").empty();
-            $("#basic-addon2").append(
-              $("<i>", { class: "glyphicon glyphicon-remove" }),
-            );
-          } else {
-            $(this).showServerError();
-            $("#basic-addon2").empty();
-            $("#basic-addon2").append(
-              $("<i>", { class: "glyphicon glyphicon-warning-sign" }),
-            );
-          }
-        },
-      });
-    }
-
-    $("#searchBarCode").on("submit", function (e) {
-      barcodeSearch(e);
-    });
-
-    $("body").on("click", "#jq-keyboard button", function (e) {
-      let pressed = $(this)[0].className.split(" ");
-      if ($("#skuCode").val() != "" && pressed[2] == "enter") {
-        barcodeSearch(e);
-      }
-    });
-
     $.fn.addProductToCart = function (data) {
       item = {
         id: data._id,
@@ -497,6 +481,8 @@ if (auth == undefined) {
         sku: data.sku,
         price: data.price,
         quantity: 1,
+        stock_quantity: data.quantity, // Store available stock
+        stock: data.stock, // Store stock status
       };
 
       if ($(this).isExist(item)) {
@@ -532,7 +518,9 @@ if (auth == undefined) {
       });
       $("#total").text(total_items);
       total = total - $("#inputDiscount").val();
-      $("#price").text(validator.unescape(settings.symbol) + moneyFormat(total.toFixed(2)));
+      $("#price").text(
+        validator.unescape(settings.symbol) + moneyFormat(total.toFixed(2)),
+      );
 
       subTotal = total;
 
@@ -549,7 +537,9 @@ if (auth == undefined) {
 
       orderTotal = grossTotal.toFixed(2);
 
-      $("#gross_price").text(validator.unescape(settings.symbol) + moneyFormat(orderTotal));
+      $("#gross_price").text(
+        validator.unescape(settings.symbol) + moneyFormat(orderTotal),
+      );
       $("#payablePrice").val(moneyFormat(grossTotal));
     };
 
@@ -558,19 +548,19 @@ if (auth == undefined) {
       $(this).calculateCart();
       $.each(cartList, function (index, data) {
         $("#cartTable .card-body").append(
-          $("<div>", { class: "row m-t-10" }).append(
-            $("<div>", { class: "col-md-1", text: index + 1 }),
-            $("<div>", { class: "col-md-3", text: data.product_name }),
-            $("<div>", { class: "col-md-3" }).append(
-              $("<div>", { class: "input-group" }).append(
+          $("<div>", { class: "row m-t-10 align-items-center" }).append(
+            $("<div>", { class: "col-xs-1", text: index + 1 }),
+            $("<div>", { class: "col-xs-4", text: data.product_name }),
+            $("<div>", { class: "col-xs-3" }).append(
+              $("<div>", { class: "input-group input-group-sm" }).append(
                 $("<span>", { class: "input-group-btn" }).append(
                   $("<button>", {
                     class: "btn btn-light",
                     onclick: "$(this).qtDecrement(" + index + ")",
-                  }).append($("<i>", { class: "fa fa-minus" })),
+                  }).append($("i", { class: "fa fa-minus" })),
                 ),
                 $("<input>", {
-                  class: "form-control",
+                  class: "num-qty form-control text-center",
                   type: "text",
                   readonly: "",
                   value: data.quantity,
@@ -581,21 +571,21 @@ if (auth == undefined) {
                   $("<button>", {
                     class: "btn btn-light",
                     onclick: "$(this).qtIncrement(" + index + ")",
-                  }).append($("<i>", { class: "fa fa-plus" })),
+                  }).append($("i", { class: "fa fa-plus" })),
                 ),
               ),
             ),
             $("<div>", {
-              class: "col-md-3",
+              class: "col-xs-3 text-right",
               text:
                 validator.unescape(settings.symbol) +
                 moneyFormat((data.price * data.quantity).toFixed(2)),
             }),
-            $("<div>", { class: "col-md-1" }).append(
+            $("<div>", { class: "col-xs-1 text-right" }).append(
               $("<button>", {
                 class: "btn btn-light btn-xs",
                 onclick: "$(this).deleteFromCart(" + index + ")",
-              }).append($("<i>", { class: "fa fa-times" })),
+              }).append($("i", { class: "fa fa-times" })),
             ),
           ),
         );
@@ -609,12 +599,8 @@ if (auth == undefined) {
 
     $.fn.qtIncrement = function (i) {
       item = cart[i];
-      let product = allProducts.filter(function (selected) {
-        return selected._id == parseInt(item.id);
-      });
-
-      if (product[0].stock == 1) {
-        if (item.quantity < product[0].quantity) {
+      if (item.stock == 1) {
+        if (item.quantity < item.stock_quantity) {
           item.quantity = parseInt(item.quantity) + 1;
           $(this).renderTable(cart);
         } else {
@@ -703,14 +689,14 @@ if (auth == undefined) {
     $.fn.submitDueOrder = function (status) {
       let items = "";
       let payment = 0;
-      paymentType = $('.list-group-item.active').data('payment-type');
+      paymentType = $(".list-group-item.active").data("payment-type");
       cart.forEach((item) => {
-    items += `<tr><td>${DOMPurify.sanitize(item.product_name)}</td><td>${
-      DOMPurify.sanitize(item.quantity)
-    } </td><td class="text-right"> ${DOMPurify.sanitize(validator.unescape(settings.symbol))} ${moneyFormat(
-      DOMPurify.sanitize(Math.abs(item.price).toFixed(2)),
-    )} </td></tr>`;
-});
+        items += `<tr><td>${DOMPurify.sanitize(item.product_name)}</td><td>${DOMPurify.sanitize(
+          item.quantity,
+        )} </td><td class="text-right"> ${DOMPurify.sanitize(validator.unescape(settings.symbol))} ${moneyFormat(
+          DOMPurify.sanitize(Math.abs(item.price).toFixed(2)),
+        )} </td></tr>`;
+      });
 
       let currentTime = new Date(moment());
       let discount = $("#inputDiscount").val();
@@ -790,83 +776,110 @@ if (auth == undefined) {
 
       logo = path.join(img_path, validator.unescape(settings.img));
 
-      receipt = `<div style="font-size: 10px">                            
-        <p style="text-align: center;">
-        ${
-          checkFileExists(logo)
-            ? `<img style='max-width: 50px' src='${logo}' /><br>`
-            : ``
-        }
-            <span style="font-size: 22px;">${validator.unescape(settings.store)}</span> <br>
-            ${validator.unescape(settings.address_one)} <br>
-            ${validator.unescape(settings.address_two)} <br>
+      receipt = `<div style="font-family: 'Helvetica Neue', sans-serif; font-size: 12px; width: 100%; color: #333;">
+        <div style="text-align: center; margin-bottom: 10px;">
             ${
-              validator.unescape(settings.contact) != "" ? "Tel: " + validator.unescape(settings.contact) + "<br>" : ""
-            } 
-            ${validator.unescape(settings.tax) != "" ? "Vat No: " + validator.unescape(settings.tax) + "<br>" : ""} 
-        </p>
-        <hr>
-        <left>
-            <p>
-            Order No : ${orderNumber} <br>
-            Ref No : ${refNumber == "" ? orderNumber : _.escape(refNumber)} <br>
-            Customer : ${
-              customer == 0 ? "Walk in customer" : _.escape(customer.name)
-            } <br>
-            Cashier : ${user.fullname} <br>
-            Date : ${date}<br>
-            </p>
+              checkFileExists(logo)
+                ? `<img style='max-width: 80px; margin-bottom: 5px;' src='${logo}' /><br>`
+                : ``
+            }
+            <h3 style="margin: 0; font-size: 18px; font-weight: bold;">${validator.unescape(settings.store)}</h3>
+            <p style="margin: 2px 0;">${validator.unescape(settings.address_one)}</p>
+            <p style="margin: 2px 0;">${validator.unescape(settings.address_two)}</p>
+            <p style="margin: 2px 0;">${
+              validator.unescape(settings.contact) != ""
+                ? "Tel: " + validator.unescape(settings.contact)
+                : ""
+            }</p>
+            <p style="margin: 2px 0;">${
+              validator.unescape(settings.tax) != ""
+                ? "Vat No: " + validator.unescape(settings.tax)
+                : ""
+            }</p>
+        </div>
+        
+        <div style="border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 5px 0; margin-bottom: 10px;">
+            <table style="width: 100%; font-size: 11px;">
+                <tr>
+                    <td><strong>Order:</strong> ${orderNumber}</td>
+                    <td style="text-align: right;"><strong>Date:</strong> ${date}</td>
+                </tr>
+                <tr>
+                    <td><strong>Cashier:</strong> ${user.fullname}</td>
+                    <td style="text-align: right;"><strong>Ref:</strong> ${refNumber == "" ? orderNumber : _.escape(refNumber)}</td>
+                </tr>
+                <tr>
+                    <td colspan="2"><strong>Customer:</strong> ${
+                      customer == 0
+                        ? "Walk in customer"
+                        : _.escape(customer.name)
+                    }</td>
+                </tr>
+            </table>
+        </div>
 
-        </left>
-        <hr>
-        <table width="90%">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
             <thead>
-            <tr>
-                <th>Item</th>
-                <th>Qty</th>
-                <th class="text-right">Price</th>
-            </tr>
+                <tr style="border-bottom: 1px solid #000;">
+                    <th style="text-align: left; padding: 5px 0;">Item</th>
+                    <th style="text-align: center; padding: 5px 0;">Qty</th>
+                    <th style="text-align: right; padding: 5px 0;">Price</th>
+                </tr>
             </thead>
             <tbody>
-             ${items}                
-            <tr><td colspan="3"><hr></td></tr>
-            <tr>                        
-                <td><b>Subtotal</b></td>
-                <td>:</td>
-                <td class="text-right"><b>${validator.unescape(settings.symbol)}${moneyFormat(
-                  subTotal.toFixed(2),
-                )}</b></td>
-            </tr>
-            <tr>
-                <td>Discount</td>
-                <td>:</td>
-                <td class="text-right">${
-                  discount > 0
-                    ? validator.unescape(settings.symbol) +
-                      moneyFormat(parseFloat(discount).toFixed(2))
-                    : ""
-                }</td>
-            </tr>
-            ${tax_row}
-            <tr>
-                <td><h5>Total</h5></td>
-                <td><h5>:</h5></td>
-                <td class="text-right">
-                    <h5>${validator.unescape(settings.symbol)} ${moneyFormat(
-                      parseFloat(orderTotal).toFixed(2),
-                    )}</h3>
-                </td>
-            </tr>
-            ${payment == 0 ? "" : payment}
+                ${items}
             </tbody>
+        </table>
+
+        <div style="border-top: 1px solid #000; padding-top: 5px;">
+            <table style="width: 100%; font-size: 12px;">
+                <tr>
+                    <td style="padding-top: 5px;">Subtotal:</td>
+                    <td style="text-align: right; padding-top: 5px;">${validator.unescape(settings.symbol)}${moneyFormat(subTotal.toFixed(2))}</td>
+                </tr>
+                ${
+                  discount > 0
+                    ? `<tr>
+                        <td>Discount:</td>
+                        <td style="text-align: right;">${validator.unescape(settings.symbol) + moneyFormat(parseFloat(discount).toFixed(2))}</td>
+                       </tr>`
+                    : ""
+                }
+                ${tax_row ? tax_row.replace(/<tr>/g, '<tr style="font-size: 11px; color: #666;">') : ""}
+                <tr style="font-weight: bold; font-size: 14px;">
+                    <td style="padding-top: 5px; border-top: 1px dashed #ccc;">Total:</td>
+                    <td style="text-align: right; padding-top: 5px; border-top: 1px dashed #ccc;">${validator.unescape(settings.symbol)}${moneyFormat(parseFloat(orderTotal).toFixed(2))}</td>
+                </tr>
+                 ${
+                   payment != 0
+                     ? `<tr>
+                        <td style="padding-top: 5px;">Paid:</td>
+                        <td style="text-align: right; padding-top: 5px;">${payment
+                          .replace(/<td class="text-right">/g, "")
+                          .replace(/<\/td>/g, "")
+                          .replace(/<td>/g, "")
+                          .replace(/<b>/g, "")
+                          .replace(/<\/b>/g, "")}</td> 
+                       </tr>`
+                     : ""
+                 }
+                 ${
+                   change > 0
+                     ? `<tr>
+                        <td>Change:</td>
+                        <td style="text-align: right;">${validator.unescape(settings.symbol)}${moneyFormat(parseFloat(change).toFixed(2))}</td>
+                       </tr>`
+                     : ""
+                 }
             </table>
-            <br>
-            <hr>
-            <br>
-            <p style="text-align: center;">
-             ${validator.unescape(settings.footer)}
-             </p>
-            </div>`;
+        </div>
+
+        <div style="text-align: center; margin-top: 15px; font-size: 11px; color: #666;">
+            <p>${validator.unescape(settings.footer)}</p>
+            <p>Thank you for purchasing!</p>
+            <p>For inquiries, contact: ${validator.unescape(settings.contact)}</p>
+        </div>
+      </div>`;
 
       if (status == 3) {
         if (cart.length > 0) {
@@ -912,7 +925,9 @@ if (auth == undefined) {
         processData: false,
         success: function (data) {
           cart = [];
-          receipt = DOMPurify.sanitize(receipt,{ ALLOW_UNKNOWN_PROTOCOLS: true });
+          receipt = DOMPurify.sanitize(receipt, {
+            ALLOW_UNKNOWN_PROTOCOLS: true,
+          });
           $("#viewTransaction").html("");
           $("#viewTransaction").html(receipt);
           $("#orderModal").modal("show");
@@ -1242,17 +1257,24 @@ if (auth == undefined) {
 
     $("#saveProduct").submit(function (e) {
       e.preventDefault();
+      console.log("Save Product Form Submitted");
 
       $(this).attr("action", api + "inventory/product");
       $(this).attr("method", "POST");
 
-      $(this).ajaxSubmit({
+      let data = $(this).serializeObject();
+      console.log("Form Data:", data);
+
+      $.ajax({
+        url: api + "inventory/product",
+        type: "POST",
+        data: JSON.stringify(data),
         contentType: "application/json",
         success: function (response) {
           $("#saveProduct").get(0).reset();
-          $("#current_img").text("");
-
+          $("#searchProductList").val("");
           loadProducts();
+          loadProductList();
           diagOptions = {
             title: "Product Saved",
             text: "Select an option below to continue.",
@@ -1265,22 +1287,20 @@ if (auth == undefined) {
             diagOptions.text,
             diagOptions.okButtonText,
             diagOptions.cancelButtonText,
-            ()=>{},
+            () => {},
             () => {
               $("#newProduct").modal("hide");
             },
           );
         },
-        //error for product
-       error: function (jqXHR,textStatus, errorThrown) {
-      console.error(jqXHR.responseJSON.message);
-      notiflix.Report.failure(
-        jqXHR.responseJSON.error,
-        jqXHR.responseJSON.message,
-        "Ok",
-      );
-      }
-
+        error: function (jqXHR, textStatus, errorThrown) {
+          console.error(jqXHR.responseJSON.message);
+          notiflix.Report.failure(
+            jqXHR.responseJSON.error,
+            jqXHR.responseJSON.message,
+            "Ok",
+          );
+        },
       });
     });
 
@@ -1313,83 +1333,75 @@ if (auth == undefined) {
             diagOptions.text,
             diagOptions.okButtonText,
             diagOptions.cancelButtonText,
-            ()=>{},
+            () => {},
 
             () => {
-                $("#newCategory").modal("hide");
+              $("#newCategory").modal("hide");
             },
           );
         },
       });
     });
 
-    $.fn.editProduct = function (index) {
+    $.fn.editProduct = function (id) {
       $("#Products").modal("hide");
+      $.get(api + "inventory/product/" + id, function (product) {
+        $("#category option")
+          .filter(function () {
+            return $(this).val() == product.category;
+          })
+          .prop("selected", true);
 
-      $("#category option")
-        .filter(function () {
-          return $(this).val() == allProducts[index].category;
-        })
-        .prop("selected", true);
+        $("#productName").val(product.name);
+        $("#product_price").val(product.price);
+        $("#quantity").val(product.quantity);
+        $("#expirationDate").val(product.expirationDate);
+        $("#minStock").val(product.minStock || 1);
+        $("#productGeneric").val(product.generic);
+        $("#product_id").val(product._id);
 
-      $("#productName").val(allProducts[index].name);
-      $("#product_price").val(allProducts[index].price);
-      $("#quantity").val(allProducts[index].quantity);
-      $("#barcode").val(allProducts[index].barcode || allProducts[index]._id);
-      $("#expirationDate").val(allProducts[index].expirationDate);
-      $("#minStock").val(allProducts[index].minStock || 1);
-      $("#product_id").val(allProducts[index]._id);
-      $("#img").val(allProducts[index].img);
+        if (product.stock == 0) {
+          $("#stock").prop("checked", true);
+        }
 
-      if (allProducts[index].img != "") {
-        $("#imagename").hide();
-        $("#current_img").html(
-          `<img src="${img_path + allProducts[index].img}" alt="">`,
-        );
-        $("#rmv_img").show();
-      }
-
-      if (allProducts[index].stock == 0) {
-        $("#stock").prop("checked", true);
-      }
-
-      $("#newProduct").modal("show");
+        $("#newProduct").modal("show");
+      });
     };
 
     $("#userModal").on("hide.bs.modal", function () {
       $(".perms").hide();
     });
 
-    $.fn.editUser = function (index) {
-      user_index = index;
-
+    $.fn.editUser = function (id) {
       $("#Users").modal("hide");
+      $.get(api + "users/user/" + id, function (user) {
+        $(".perms").show();
 
-      $(".perms").show();
+        $("#user_id").val(user._id);
+        $("#fullname").val(user.fullname);
+        $("#username").val(validator.unescape(user.username));
+        $("#password").attr("placeholder", "New Password");
 
-      $("#user_id").val(allUsers[index]._id);
-      $("#fullname").val(allUsers[index].fullname);
-      $("#username").val(validator.unescape(allUsers[index].username));
-      $("#password").attr("placeholder", "New Password");
-    
-
-      for (perm of permissions) {
-        var el = "#" + perm;
-        if (allUsers[index][perm] == 1) {
-          $(el).prop("checked", true);
-        } else {
-          $(el).prop("checked", false);
+        for (perm of permissions) {
+          var el = "#" + perm;
+          if (user[perm] == 1) {
+            $(el).prop("checked", true);
+          } else {
+            $(el).prop("checked", false);
+          }
         }
-      }
 
-      $("#userModal").modal("show");
+        $("#userModal").modal("show");
+      });
     };
 
-    $.fn.editCategory = function (index) {
+    $.fn.editCategory = function (id) {
       $("#Categories").modal("hide");
-      $("#categoryName").val(allCategories[index].name);
-      $("#category_id").val(allCategories[index]._id);
-      $("#newCategory").modal("show");
+      $.get(api + "categories/category/" + id, function (category) {
+        $("#categoryName").val(category.name);
+        $("#category_id").val(category._id);
+        $("#newCategory").modal("show");
+      });
     };
 
     $.fn.deleteProduct = function (id) {
@@ -1481,14 +1493,19 @@ if (auth == undefined) {
       loadCategoryList();
     });
 
-    function loadUserList() {
-      let counter = 0;
-      let user_list = "";
-      $("#user_list").empty();
-      $("#userList").DataTable().destroy();
+    function loadUserList(page = 1) {
+      let limit = 10;
+      let url = api + "users/all?page=" + page + "&limit=" + limit;
 
-      $.get(api + "users/all", function (users) {
-        allUsers = [...users];
+      $.get(url, function (response) {
+        let users = response.data;
+        let total = response.total;
+        allUsers = [...users]; // Update allUsers to current page for editUser to work (it uses index)
+
+        let counter = 0;
+        let user_list = "";
+        $("#user_list").empty();
+        // $("#userList").DataTable().destroy();
 
         users.forEach((user, index) => {
           state = [];
@@ -1499,7 +1516,9 @@ if (auth == undefined) {
             login_status = state[0];
             login_time = state[1];
 
-            switch (login) {
+            switch (
+              login_status // Fixed variable name from login to login_status
+            ) {
               case "Logged In":
                 class_name = "btn-default";
 
@@ -1521,169 +1540,164 @@ if (auth == undefined) {
               user._id == 1
                 ? '<span class="btn-group"><button class="btn btn-dark"><i class="fa fa-edit"></i></button><button class="btn btn-dark"><i class="fa fa-trash"></i></button></span>'
                 : '<span class="btn-group"><button onClick="$(this).editUser(' +
-                  index +
+                  user._id +
                   ')" class="btn btn-warning"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteUser(' +
                   user._id +
                   ')" class="btn btn-danger"><i class="fa fa-trash"></i></button></span>'
             }</td></tr>`;
-
-          if (counter == users.length) {
-            $("#user_list").html(user_list);
-
-            $("#userList").DataTable({
-              order: [[1, "desc"]],
-              autoWidth: false,
-              info: true,
-              JQueryUI: true,
-              ordering: true,
-              paging: false,
-            });
-          }
         });
+
+        $("#user_list").html(user_list);
+        renderPagination(total, limit, page, "loadUserList", "#userList");
       });
     }
 
-    function loadProductList() {
-      let products = [...allProducts];
-      let product_list = "";
-      let counter = 0;
-      $("#product_list").empty();
-      $("#productList").DataTable().destroy();
+    function loadProductList(page = 1, query = "") {
+      let limit = 10;
 
-      products.forEach((product, index) => {
-        counter++;
+      if (query == "" && $("#searchProductList").val() != "") {
+        query = $("#searchProductList").val();
+      }
 
-        let category = allCategories.filter(function (category) {
-          return category._id == product.category;
-        });
+      let url = api + "inventory/products?page=" + page + "&limit=" + limit;
+      if (query != "") url += "&q=" + query;
 
-        product.stockAlert = "";
-        const todayDate = moment();
-        const expiryDate = moment(product.expirationDate, DATE_FORMAT);
+      console.log(
+        "Loading Product List Page:",
+        page,
+        "Query:",
+        query,
+        "URL:",
+        url,
+      );
+      $.get(url, function (response) {
+        console.log("Product List Response:", response);
+        let products = response.data;
+        let total = response.total;
 
-        //show stock status indicator
-        const stockStatus = getStockStatus(product.quantity,product.minStock);
-          if(stockStatus<=0)
-          {
-          if (stockStatus === 0) {
-            product.stockStatus = "No Stock";
+        let product_list = "";
+        let counter = 0;
+        $("#product_list").empty();
+        // $("#productList").DataTable().destroy(); // removed datatable
+
+        products.forEach((product, index) => {
+          counter++;
+
+          let category = allCategories.filter(function (category) {
+            return category._id == product.category;
+          });
+
+          product.stockAlert = "";
+          const todayDate = moment();
+          const expiryDate = moment(product.expirationDate, DATE_FORMAT);
+
+          //show stock status indicator
+          const stockStatus = getStockStatus(
+            product.quantity,
+            product.minStock,
+          );
+          if (stockStatus <= 0) {
+            if (stockStatus === 0) {
+              product.stockStatus = "No Stock";
+              icon = "fa fa-exclamation-triangle";
+            }
+            if (stockStatus === -1) {
+              product.stockStatus = "Low Stock";
+              icon = "fa fa-caret-down";
+            }
+
+            product.stockAlert = `<p class="text-danger"><small><i class="${icon}"></i> ${product.stockStatus}</small></p>`;
+          }
+          //calculate days to expiry
+          product.expiryAlert = "";
+          if (!isExpired(expiryDate)) {
+            const diffDays = daysToExpire(expiryDate);
+
+            if (diffDays > 0 && diffDays <= 30) {
+              var days_noun = diffDays > 1 ? "days" : "day";
+              icon = "fa fa-clock-o";
+              product.expiryStatus = `${diffDays} ${days_noun} left`;
+              product.expiryAlert = `<p class="text-danger"><small><i class="${icon}"></i> ${product.expiryStatus}</small></p>`;
+            }
+          } else {
             icon = "fa fa-exclamation-triangle";
-          }
-          if (stockStatus === -1) {
-            product.stockStatus = "Low Stock";
-            icon = "fa fa-caret-down";
-          }
-
-          product.stockAlert = `<p class="text-danger"><small><i class="${icon}"></i> ${product.stockStatus}</small></p>`;
-        }
-        //calculate days to expiry
-        product.expiryAlert = "";
-        if (!isExpired(expiryDate)) {
-          const diffDays = daysToExpire(expiryDate);
-
-          if (diffDays > 0 && diffDays <= 30) {
-            var days_noun = diffDays > 1 ? "days" : "day";
-            icon = "fa fa-clock-o";
-            product.expiryStatus = `${diffDays} ${days_noun} left`;
+            product.expiryStatus = "Expired";
             product.expiryAlert = `<p class="text-danger"><small><i class="${icon}"></i> ${product.expiryStatus}</small></p>`;
           }
-        } else {
-          icon = "fa fa-exclamation-triangle";
-          product.expiryStatus = "Expired";
-          product.expiryAlert = `<p class="text-danger"><small><i class="${icon}"></i> ${product.expiryStatus}</small></p>`;
-        }
 
-        if(product.img==="")
-        {
-          product_img=default_item_img;
-        }
-        else
-        {
-          product_img = img_path + product.img;
-          product_img = checkFileExists(product_img)
-          ? product_img
-          : default_item_img;
-        }
-        
-        //render product list
-        product_list +=
-          `<tr>
-            <td><img id="` +
-          product._id +
-          `"></td>
-            <td><img style="max-height: 50px; max-width: 50px; border: 1px solid #ddd;" src="${product_img}" id="product_img"></td>
-            <td>${product.name}
-            ${product.expiryAlert}</td>
-            <td>${validator.unescape(settings.symbol)}${product.price}</td>
-            <td>${product.stock == 1 ? product.quantity : "N/A"}
-            ${product.stockAlert}
-            </td>
-            <td>${product.expirationDate}</td>
-            <td>${category.length > 0 ? category[0].name : ""}</td>
-            <td class="nobr"><span class="btn-group"><button onClick="$(this).editProduct(${index})" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteProduct(${
-              product._id
-            })" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></button></span></td></tr>`;
+          product_list += `<tr>
+              <td>${product.generic && product.generic !== "undefined" ? product.generic : product.name}</td>
+              <td>${product.name}
+              ${product.expiryAlert}</td>
+              <td>${validator.unescape(settings.symbol)}${product.price}</td>
+              <td>${product.stock == 1 ? product.quantity : "N/A"}
+              ${product.stockAlert}
+              </td>
+              <td>${product.expirationDate}</td>
+              <td>${category.length > 0 && category[0] ? category[0].name : ""}</td>
+              <td class="nobr"><span class="btn-group"><button onClick="$(this).editProduct(${product._id})" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteProduct(${
+                product._id
+              })" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></button></span></td></tr>`;
 
-        if (counter == allProducts.length) {
-          $("#product_list").html(product_list);
-
-          products.forEach((product) => {
-            let bcode = product.barcode || product._id;
-            $("#" + product._id + "").JsBarcode(bcode, {
-              width: 2,
-              height: 25,
-              fontSize: 14,
-            });
-          });
-        }
-      });
-
-      $("#productList").DataTable({
-        order: [[1, "desc"]],
-        autoWidth: false,
-        info: true,
-        JQueryUI: true,
-        ordering: true,
-        paging: false,
-        dom: "Bfrtip",
-        buttons: [
-          {
-            extend: "pdfHtml5",
-            className: "btn btn-light", // Custom class name
-            text: " Download PDF", // Custom text
-            filename: "product_list.pdf", // Default filename
-          },
-        ],
-      });
-    }
-
-    function loadCategoryList() {
-      let category_list = "";
-      let counter = 0;
-      $("#category_list").empty();
-      $("#categoryList").DataTable().destroy();
-
-      allCategories.forEach((category, index) => {
-        counter++;
-
-        category_list += `<tr>
-     
-            <td>${category.name}</td>
-            <td><span class="btn-group"><button onClick="$(this).editCategory(${index})" class="btn btn-warning"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteCategory(${category._id})" class="btn btn-danger"><i class="fa fa-trash"></i></button></span></td></tr>`;
-      });
-
-      if (counter == allCategories.length) {
-        $("#category_list").html(category_list);
-        $("#categoryList").DataTable({
-          autoWidth: false,
-          info: true,
-          JQueryUI: true,
-          ordering: true,
-          paging: false,
+          // Note: editProduct index might refer to allProducts index in old code?
+          // If we paginate, index 0 is first item on page.
+          // editProduct uses allProducts[index].
+          // We must update editProduct to use products[index] or update allProducts.
+          // Since editProduct logic relies on `allProducts`, we should probably update `allProducts`
+          // OR pass the full product object to editProduct.
+          // Given constraints, I will update allProducts to be the current page products for management?
+          // BUT loadProducts (POS) also sets allProducts. They conflict.
+          // Best to pass ID to editProduct and fetch fresh, OR pass the object directly.
+          // But `editProduct(index)` is called from HTML.
+          // I will hack it: update allProducts? No, POS needs it.
+          // I'll make a temporary `currentListProducts`?
+          // Actually, I can just attach the product object to the button using data attribute!
+          // But `onclick` string is hardcoded.
+          // I will change the onClick to `editProduct(${product._id})` and fetch it?
+          // Or `editProduct` uses `allProducts[index]`.
         });
-      }
+
+        // Update allProducts? No, that breaks POS.
+        // I will temporarily shadow allProducts for the list management? No.
+        // I should change editProduct to accept ID and fetch, or look up in `products` array which I'll enable globally as `managementProducts`.
+
+        $("#product_list").html(product_list);
+        renderPagination(total, limit, page, "loadProductList", "#productList");
+      });
     }
 
+    function loadCategoryList(page = 1) {
+      let limit = 10;
+      let url = api + "categories/all?page=" + page + "&limit=" + limit;
+
+      $.get(url, function (response) {
+        let categories = response.data;
+        let total = response.total;
+
+        let category_list = "";
+        let counter = 0;
+        $("#category_list").empty();
+        // $("#categoryList").DataTable().destroy();
+
+        categories.forEach((category, index) => {
+          counter++;
+          category_list += `<tr>
+            <td>${category.name}</td>
+            <td><span class="btn-group"><button onClick="$(this).editCategory(${category._id})" class="btn btn-warning"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteCategory(${
+              category._id
+            })" class="btn btn-danger"><i class="fa fa-trash"></i></button></span></td></tr>`;
+        });
+
+        $("#category_list").html(category_list);
+        renderPagination(
+          total,
+          limit,
+          page,
+          "loadCategoryList",
+          "#categoryList",
+        );
+      });
+    }
 
     $("#log-out").on("click", function () {
       const diagOptions = {
@@ -1719,24 +1733,28 @@ if (auth == undefined) {
         mac_address = mac;
       });
       const appChoice = $("#app").find("option:selected").text();
-    
+
       formData["app"] = appChoice;
       formData["mac"] = mac_address;
       formData["till"] = 1;
 
       // Update application field in settings form
       let $appField = $("#settings_form input[name='app']");
-      let $hiddenAppField = $('<input>', {
-        type: 'hidden',
-        name: 'app',
-        value: formData.app
-    });
-        $appField.length 
-            ? $appField.val(formData.app) 
-            : $("#settings_form").append(`<input type="hidden" name="app" value="${$hiddenAppField}" />`);
+      let $hiddenAppField = $("<input>", {
+        type: "hidden",
+        name: "app",
+        value: formData.app,
+      });
+      $appField.length
+        ? $appField.val(formData.app)
+        : $("#settings_form").append(
+            `<input type="hidden" name="app" value="${$hiddenAppField}" />`,
+          );
 
-
-      if (formData.percentage != "" && typeof formData.percentage === 'number') {
+      if (
+        formData.percentage != "" &&
+        typeof formData.percentage === "number"
+      ) {
         notiflix.Report.warning(
           "Oops!",
           "Please make sure the tax value is a number",
@@ -1760,10 +1778,10 @@ if (auth == undefined) {
               jqXHR.responseJSON.message,
               "Ok",
             );
+          },
+        });
       }
     });
-    }
-  });
 
     $("#net_settings_form").on("submit", function (e) {
       e.preventDefault();
@@ -1821,7 +1839,7 @@ if (auth == undefined) {
               notiflix.Report.success("Great!", "User details saved!", "Ok");
             }
           },
-          error: function (jqXHR,textStatus, errorThrown) {
+          error: function (jqXHR, textStatus, errorThrown) {
             notiflix.Report.failure(
               jqXHR.responseJSON.error,
               jqXHR.responseJSON.message,
@@ -1926,7 +1944,7 @@ if (auth == undefined) {
           .prop("selected", true);
       }
     });
- });
+  });
 
   $("#rmv_logo").on("click", function () {
     $("#remove_logo").val("1");
@@ -1993,12 +2011,14 @@ function loadTransactions() {
                                   "DD-MMM-YYYY HH:mm:ss",
                                 )}</td>
                                 <td>${
-                                  validator.unescape(settings.symbol) + moneyFormat(trans.total)
+                                  validator.unescape(settings.symbol) +
+                                  moneyFormat(trans.total)
                                 }</td>
                                 <td>${
                                   trans.paid == ""
                                     ? ""
-                                    : validator.unescape(settings.symbol) + moneyFormat(trans.paid)
+                                    : validator.unescape(settings.symbol) +
+                                      moneyFormat(trans.paid)
                                 }</td>
                                 <td>${
                                   trans.change
@@ -2009,9 +2029,7 @@ function loadTransactions() {
                                     : ""
                                 }</td>
                                 <td>${
-                                  trans.paid == ""
-                                    ? ""
-                                    : trans.payment_type
+                                  trans.paid == "" ? "" : trans.payment_type
                                 }</td>
                                 <td>${trans.till}</td>
                                 <td>${trans.user}</td>
@@ -2026,7 +2044,8 @@ function loadTransactions() {
 
         if (counter == transactions.length) {
           $("#total_sales #counter").text(
-            validator.unescape(settings.symbol) + moneyFormat(parseFloat(sales).toFixed(2)),
+            validator.unescape(settings.symbol) +
+              moneyFormat(parseFloat(sales).toFixed(2)),
           );
           $("#total_transactions #counter").text(transact);
 
@@ -2187,7 +2206,6 @@ $.fn.viewTransaction = function (index) {
   });
 
   paymentMethod = allTransactions[index].payment_type;
- 
 
   if (allTransactions[index].paid != "") {
     payment = `<tr>
@@ -2221,96 +2239,115 @@ $.fn.viewTransaction = function (index) {
             </tr>`;
   }
 
-    logo = path.join(img_path, validator.unescape(settings.img));
-      
-      receipt = `<div style="font-size: 10px">                            
-        <p style="text-align: center;">
-        ${
-          checkFileExists(logo)
-            ? `<img style='max-width: 50px' src='${logo}' /><br>`
-            : ``
-        }
-            <span style="font-size: 22px;">${validator.unescape(settings.store)}</span> <br>
-            ${validator.unescape(settings.address_one)} <br>
-            ${validator.unescape(settings.address_two)} <br>
+  logo = path.join(img_path, validator.unescape(settings.img));
+
+  receipt = `<div style="font-family: 'Helvetica Neue', sans-serif; font-size: 12px; width: 100%; color: #333;">
+        <div style="text-align: center; margin-bottom: 10px;">
             ${
-              validator.unescape(settings.contact) != "" ? "Tel: " + validator.unescape(settings.contact) + "<br>" : ""
-            } 
-            ${validator.unescape(settings.tax) != "" ? "Vat No: " + validator.unescape(settings.tax) + "<br>" : ""} 
-    </p>
-    <hr>
-    <left>
-        <p>
-        Invoice : ${orderNumber} <br>
-        Ref No : ${refNumber} <br>
-        Customer : ${
-          allTransactions[index].customer == 0
-            ? "Walk in Customer"
-            : allTransactions[index].customer.name
-        } <br>
-        Cashier : ${allTransactions[index].user} <br>
-        Date : ${moment(allTransactions[index].date).format(
-          "DD MMM YYYY HH:mm:ss",
-        )}<br>
-        </p>
-
-    </left>
-    <hr>
-    <table width="90%">
-        <thead>
-        <tr>
-            <th>Item</th>
-            <th>Qty</th>
-            <th class="text-right">Price</th>
-        </tr>
-        </thead>
-        <tbody>
-        ${items}                
-        <tr><td colspan="3"><hr></td></tr>
-        <tr>                        
-            <td><b>Subtotal</b></td>
-            <td>:</td>
-            <td class="text-right"><b>${validator.unescape(settings.symbol)}${moneyFormat(
-              allTransactions[index].subtotal,
-            )}</b></td>
-        </tr>
-        <tr>
-            <td>Discount</td>
-            <td>:</td>
-            <td class="text-right">${
-              discount > 0
-                ? validator.unescape(settings.symbol) +
-                  moneyFormat(
-                    parseFloat(allTransactions[index].discount).toFixed(2),
-                  )
+              checkFileExists(logo)
+                ? `<img style='max-width: 80px; margin-bottom: 5px;' src='${logo}' /><br>`
+                : ``
+            }
+            <h3 style="margin: 0; font-size: 18px; font-weight: bold;">${validator.unescape(settings.store)}</h3>
+            <p style="margin: 2px 0;">${validator.unescape(settings.address_one)}</p>
+            <p style="margin: 2px 0;">${validator.unescape(settings.address_two)}</p>
+            <p style="margin: 2px 0;">${
+              validator.unescape(settings.contact) != ""
+                ? "Tel: " + validator.unescape(settings.contact)
                 : ""
-            }</td>
-        </tr>
-        
-        ${tax_row}
-    
-        <tr>
-            <td><h5>Total</h5></td>
-            <td><h5>:</h5></td>
-            <td class="text-right">
-                <h5>${validator.unescape(settings.symbol)}${moneyFormat(
-                  allTransactions[index].total,
-                )}</h5>
-            </td>
-        </tr>
-        ${payment == 0 ? "" : payment}
-        </tbody>
-        </table>
-        <br>
-        <hr>
-        <br>
-        <p style="text-align: center;">
-         ${validator.unescape(settings.footer)}
-         </p>
-        </div>`;
+            }</p>
+            <p style="margin: 2px 0;">${
+              validator.unescape(settings.tax) != ""
+                ? "Vat No: " + validator.unescape(settings.tax)
+                : ""
+            }</p>
+        </div>
 
-        //prevent DOM XSS; allow windows paths in img src
-        receipt = DOMPurify.sanitize(receipt,{ ALLOW_UNKNOWN_PROTOCOLS: true });
+        <div style="border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 5px 0; margin-bottom: 10px;">
+            <table style="width: 100%; font-size: 11px;">
+                <tr>
+                    <td><strong>Order:</strong> ${orderNumber}</td>
+                    <td style="text-align: right;"><strong>Date:</strong> ${moment(allTransactions[index].date).format("DD MMM YYYY HH:mm")}</td>
+                </tr>
+                <tr>
+                    <td><strong>Cashier:</strong> ${allTransactions[index].user}</td>
+                    <td style="text-align: right;"><strong>Ref:</strong> ${refNumber}</td>
+                </tr>
+                <tr>
+                    <td colspan="2"><strong>Customer:</strong> ${
+                      allTransactions[index].customer == 0
+                        ? "Walk in Customer"
+                        : allTransactions[index].customer.name
+                    }</td>
+                </tr>
+            </table>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+            <thead>
+                <tr style="border-bottom: 1px solid #000;">
+                    <th style="text-align: left; padding: 5px 0;">Item</th>
+                    <th style="text-align: center; padding: 5px 0;">Qty</th>
+                    <th style="text-align: right; padding: 5px 0;">Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items}
+            </tbody>
+        </table>
+
+        <div style="border-top: 1px solid #000; padding-top: 5px;">
+             <table style="width: 100%; font-size: 12px;">
+                <tr>
+                    <td style="padding-top: 5px;">Subtotal:</td>
+                    <td style="text-align: right; padding-top: 5px;">${validator.unescape(settings.symbol)}${moneyFormat(allTransactions[index].subtotal)}</td>
+                </tr>
+                ${
+                  discount > 0
+                    ? `<tr>
+                        <td>Discount:</td>
+                        <td style="text-align: right;">${validator.unescape(settings.symbol) + moneyFormat(parseFloat(allTransactions[index].discount).toFixed(2))}</td>
+                       </tr>`
+                    : ""
+                }
+                ${tax_row ? tax_row.replace(/<tr>/g, '<tr style="font-size: 11px; color: #666;">') : ""}
+                <tr style="font-weight: bold; font-size: 14px;">
+                    <td style="padding-top: 5px; border-top: 1px dashed #ccc;">Total:</td>
+                    <td style="text-align: right; padding-top: 5px; border-top: 1px dashed #ccc;">${validator.unescape(settings.symbol)}${moneyFormat(allTransactions[index].total)}</td>
+                </tr>
+                 ${
+                   payment != 0
+                     ? `<tr>
+                        <td style="padding-top: 5px;">Paid:</td>
+                         <td style="text-align: right; padding-top: 5px;">${payment
+                           .replace(/<td class="text-right">/g, "")
+                           .replace(/<\/td>/g, "")
+                           .replace(/<td>/g, "")
+                           .replace(/<b>/g, "")
+                           .replace(/<\/b>/g, "")}</td> 
+                       </tr>`
+                     : ""
+                 }
+                 ${
+                   allTransactions[index].change > 0
+                     ? `<tr>
+                        <td>Change:</td>
+                        <td style="text-align: right;">${validator.unescape(settings.symbol)}${moneyFormat(parseFloat(allTransactions[index].change).toFixed(2))}</td>
+                       </tr>`
+                     : ""
+                 }
+            </table>
+        </div>
+
+        <div style="text-align: center; margin-top: 15px; font-size: 11px; color: #666;">
+            <p>${validator.unescape(settings.footer)}</p>
+            <p>Thank you for purchasing!</p>
+            <p>For inquiries, contact: ${validator.unescape(settings.contact)}</p>
+        </div>
+      </div>`;
+
+  //prevent DOM XSS; allow windows paths in img src
+  receipt = DOMPurify.sanitize(receipt, { ALLOW_UNKNOWN_PROTOCOLS: true });
 
   $("#viewTransaction").html("");
   $("#viewTransaction").html(receipt);
@@ -2386,7 +2423,7 @@ $("#quit").on("click", function () {
     text: "You are about to close the application.",
     icon: "warning",
     okButtonText: "Close Application",
-    cancelButtonText: "Cancel"
+    cancelButtonText: "Cancel",
   };
 
   notiflix.Confirm.show(

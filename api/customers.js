@@ -8,11 +8,11 @@ const validator = require("validator");
 const appName = process.env.APPNAME;
 const appData = process.env.APPDATA;
 const dbPath = path.join(
-    appData,
-    appName,
-    "server",
-    "databases",
-    "customers.db",
+  appData,
+  appName,
+  "server",
+  "databases",
+  "customers.db",
 );
 
 app.use(bodyParser.json());
@@ -20,8 +20,8 @@ app.use(bodyParser.json());
 module.exports = app;
 
 let customerDB = new Datastore({
-    filename: dbPath,
-    autoload: true,
+  filename: dbPath,
+  autoload: true,
 });
 
 customerDB.ensureIndex({ fieldName: "_id", unique: true });
@@ -34,7 +34,7 @@ customerDB.ensureIndex({ fieldName: "_id", unique: true });
  * @returns {void}
  */
 app.get("/", function (req, res) {
-    res.send("Customer API");
+  res.send("Customer API");
 });
 
 /**
@@ -45,18 +45,18 @@ app.get("/", function (req, res) {
  * @returns {void}
  */
 app.get("/customer/:customerId", function (req, res) {
-    if (!req.params.customerId) {
-        res.status(500).send("ID field is required.");
-    } else {
-        customerDB.findOne(
-            {
-                _id: req.params.customerId,
-            },
-            function (err, customer) {
-                res.send(customer);
-            },
-        );
-    }
+  if (!req.params.customerId) {
+    res.status(500).send("ID field is required.");
+  } else {
+    customerDB.findOne(
+      {
+        _id: req.params.customerId,
+      },
+      function (err, customer) {
+        res.send(customer);
+      },
+    );
+  }
 });
 
 /**
@@ -67,9 +67,27 @@ app.get("/customer/:customerId", function (req, res) {
  * @returns {void}
  */
 app.get("/all", function (req, res) {
-    customerDB.find({}, function (err, docs) {
-        res.send(docs);
-    });
+  let limit = parseInt(req.query.limit) || 10;
+  let page = parseInt(req.query.page) || 1;
+  let skip = (page - 1) * limit;
+
+  customerDB.count({}, function (err, count) {
+    if (err) {
+      res.status(500).send(err);
+    } else {
+      customerDB
+        .find({})
+        .skip(skip)
+        .limit(limit)
+        .exec(function (err, docs) {
+          if (err) {
+            res.status(500).send(err);
+          } else {
+            res.send({ data: docs, total: count });
+          }
+        });
+    }
+  });
 });
 
 /**
@@ -80,18 +98,18 @@ app.get("/all", function (req, res) {
  * @returns {void}
  */
 app.post("/customer", function (req, res) {
-    var newCustomer = req.body;
-    customerDB.insert(newCustomer, function (err, customer) {
-        if (err) {
-            console.error(err);
-            res.status(500).json({
-                error: "Internal Server Error",
-                message: "An unexpected error occurred.",
-            });
-        } else {
-            res.sendStatus(200);
-        }
-    });
+  var newCustomer = req.body;
+  customerDB.insert(newCustomer, function (err, customer) {
+    if (err) {
+      console.error(err);
+      res.status(500).json({
+        error: "Internal Server Error",
+        message: "An unexpected error occurred.",
+      });
+    } else {
+      res.sendStatus(200);
+    }
+  });
 });
 
 /**
@@ -102,22 +120,22 @@ app.post("/customer", function (req, res) {
  * @returns {void}
  */
 app.delete("/customer/:customerId", function (req, res) {
-    customerDB.remove(
-        {
-            _id: req.params.customerId,
-        },
-        function (err, numRemoved) {
-            if (err) {
-                console.error(err);
-                res.status(500).json({
-                    error: "Internal Server Error",
-                    message: "An unexpected error occurred.",
-                });
-            } else {
-                res.sendStatus(200);
-            }
-        },
-    );
+  customerDB.remove(
+    {
+      _id: req.params.customerId,
+    },
+    function (err, numRemoved) {
+      if (err) {
+        console.error(err);
+        res.status(500).json({
+          error: "Internal Server Error",
+          message: "An unexpected error occurred.",
+        });
+      } else {
+        res.sendStatus(200);
+      }
+    },
+  );
 });
 
 /**
@@ -128,24 +146,24 @@ app.delete("/customer/:customerId", function (req, res) {
  * @returns {void}
  */
 app.put("/customer", function (req, res) {
-    let customerId = validator.escape(req.body._id);
+  let customerId = validator.escape(req.body._id);
 
-    customerDB.update(
-        {
-            _id: customerId,
-        },
-        req.body,
-        {},
-        function (err, numReplaced, customer) {
-            if (err) {
-                console.error(err);
-                res.status(500).json({
-                    error: "Internal Server Error",
-                    message: "An unexpected error occurred.",
-                });
-            } else {
-                res.sendStatus(200);
-            }
-        },
-    );
+  customerDB.update(
+    {
+      _id: customerId,
+    },
+    req.body,
+    {},
+    function (err, numReplaced, customer) {
+      if (err) {
+        console.error(err);
+        res.status(500).json({
+          error: "Internal Server Error",
+          message: "An unexpected error occurred.",
+        });
+      } else {
+        res.sendStatus(200);
+      }
+    },
+  );
 });
