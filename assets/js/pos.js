@@ -260,7 +260,8 @@ if (auth == undefined) {
 
     loadCategories();
     loadProducts();
-    loadCustomers();
+    // CUSTOMER DROPDOWN - COMMENTED OUT
+    // loadCustomers();
 
     // Pagination Click Handler
     $(document).on("click", ".pagination-btn", function (e) {
@@ -437,18 +438,19 @@ if (auth == undefined) {
       });
     }
 
-    function loadCustomers() {
-      $.get(api + "customers/all", function (customers) {
-        $("#customer").html(
-          `<option value="0" selected="selected">Walk in customer</option>`,
-        );
+    // CUSTOMER DROPDOWN - COMMENTED OUT FOR SIMPLICITY
+    // function loadCustomers() {
+    //   $.get(api + "customers/all", function (customers) {
+    //     $("#customer").html(
+    //       `<option value="0" selected="selected">Walk in customer</option>`,
+    //     );
 
-        customers.forEach((cust) => {
-          let customer = `<option value='{"id": ${cust._id}, "name": "${cust.name}"}'>${cust.name}</option>`;
-          $("#customer").append(customer);
-        });
-      });
-    }
+    //     customers.forEach((cust) => {
+    //       let customer = `<option value='{"id": ${cust._id}, "name": "${cust.name}"}'>${cust.name}</option>`;
+    //       $("#customer").append(customer);
+    //     });
+    //   });
+    // }
 
     $.fn.addToCart = function (id, count, stock) {
       $.get(api + "inventory/product/" + id, function (product) {
@@ -700,7 +702,9 @@ if (auth == undefined) {
 
       let currentTime = new Date(moment());
       let discount = $("#inputDiscount").val();
-      let customer = JSON.parse($("#customer").val());
+      // CUSTOMER DROPDOWN - COMMENTED OUT, defaulting to walk-in customer
+      // let customer = JSON.parse($("#customer").val());
+      let customer = 0; // Default to walk-in customer
       let date = moment(currentTime).format("YYYY-MM-DD HH:mm:ss");
       let paymentAmount = $("#payment").val().replace(",", "");
       let changeAmount = $("#change").text().replace(",", "");
@@ -753,11 +757,12 @@ if (auth == undefined) {
                 </tr>`;
       }
 
+      // CUSTOMER DROPDOWN - COMMENTED OUT, validation adjusted for walk-in customer only
       if (status == 0) {
-        if ($("#customer").val() == 0 && $("#refNumber").val() == "") {
+        if ($("#refNumber").val() == "") {
           notiflix.Report.warning(
             "Reference Required!",
-            "You either need to select a customer <br> or enter a reference!",
+            "You need to enter a reference for hold orders!",
             "Ok",
           );
           return;
@@ -932,7 +937,8 @@ if (auth == undefined) {
           $("#viewTransaction").html(receipt);
           $("#orderModal").modal("show");
           loadProducts();
-          loadCustomers();
+          // CUSTOMER DROPDOWN - COMMENTED OUT (fixes infinite loader bug)
+          // loadCustomers();
           $(".loading").hide();
           $("#dueModal").modal("hide");
           $("#paymentModel").modal("hide");
@@ -1042,13 +1048,14 @@ if (auth == undefined) {
       if (orderType == 1) {
         $("#refNumber").val(holdOrderList[index].ref_number);
 
-        $("#customer option:selected").removeAttr("selected");
+        // CUSTOMER DROPDOWN - COMMENTED OUT
+        // $("#customer option:selected").removeAttr("selected");
 
-        $("#customer option")
-          .filter(function () {
-            return $(this).text() == "Walk in customer";
-          })
-          .prop("selected", true);
+        // $("#customer option")
+        //   .filter(function () {
+        //     return $(this).text() == "Walk in customer";
+        //   })
+        //   .prop("selected", true);
 
         holdOrder = holdOrderList[index]._id;
         cart = [];
@@ -1982,9 +1989,11 @@ function loadTransactions() {
   let query = `by-date?start=${start_date}&end=${end_date}&user=${by_user}&status=${by_status}&till=${by_till}`;
 
   $.get(api + query, function (transactions) {
-    if (transactions.length > 0) {
+    if (transactions && transactions.length > 0) {
       $("#transaction_list").empty();
-      $("#transactionList").DataTable().destroy();
+      if ($.fn.DataTable.isDataTable("#transactionList")) {
+        $("#transactionList").DataTable().destroy();
+      }
 
       allTransactions = [...transactions];
 
@@ -1992,9 +2001,11 @@ function loadTransactions() {
         sales += parseFloat(trans.total);
         transact++;
 
-        trans.items.forEach((item) => {
-          sold_items.push(item);
-        });
+        if (trans.items && Array.isArray(trans.items)) {
+          trans.items.forEach((item) => {
+            if (item) sold_items.push(item);
+          });
+        }
 
         if (!tills.includes(trans.till)) {
           tills.push(trans.till);
@@ -2031,8 +2042,6 @@ function loadTransactions() {
                                 <td>${
                                   trans.paid == "" ? "" : trans.payment_type
                                 }</td>
-                                <td>${trans.till}</td>
-                                <td>${trans.user}</td>
                                 <td>${
                                   trans.paid == ""
                                     ? '<button class="btn btn-dark"><i class="fa fa-search-plus"></i></button>'
@@ -2051,9 +2060,16 @@ function loadTransactions() {
 
           const result = {};
 
-          for (const { product_name, price, quantity, id } of sold_items) {
-            if (!result[product_name]) result[product_name] = [];
-            result[product_name].push({ id, price, quantity });
+          for (const item of sold_items) {
+            if (item && item.product_name) {
+              const { product_name, price, quantity, id } = item;
+              if (!result[product_name]) result[product_name] = [];
+              result[product_name].push({
+                id: id || 0,
+                price: price || 0,
+                quantity: quantity || 0,
+              });
+            }
           }
 
           for (item in result) {
@@ -2063,8 +2079,8 @@ function loadTransactions() {
 
             result[item].forEach((i) => {
               id = i.id;
-              price = i.price;
-              quantity = quantity + parseInt(i.quantity);
+              price = i.price || 0;
+              quantity = quantity + (parseInt(i.quantity) || 0);
             });
 
             sold.push({
@@ -2075,14 +2091,10 @@ function loadTransactions() {
             });
           }
 
-          loadSoldProducts();
-
-          if (by_user == 0 && by_till == 0) {
-            userFilter(users);
-            tillFilter(tills);
-          }
-
           $("#transaction_list").html(transaction_list);
+          if ($.fn.DataTable.isDataTable("#transactionList")) {
+            $("#transactionList").DataTable().destroy();
+          }
           $("#transactionList").DataTable({
             order: [[1, "desc"]],
             autoWidth: false,
@@ -2093,9 +2105,18 @@ function loadTransactions() {
             dom: "Bfrtip",
             buttons: ["csv", "excel", "pdf"],
           });
+
+          loadSoldProducts();
         }
       });
     } else {
+      $("#transaction_list").empty();
+      $("#total_sales #counter").text(
+        validator.unescape(settings.symbol) + "0.00",
+      );
+      $("#total_transactions #counter").text(0);
+      $("#total_items #counter").text(0);
+      $("#total_products #counter").text(0);
       notiflix.Report.warning(
         "No data!",
         "No transactions available within the selected criteria",
@@ -2134,16 +2155,15 @@ function loadSoldProducts() {
 
     counter++;
 
+    let stockStatus = "N/A";
+    if (product && product.length > 0) {
+      stockStatus = product[0].stock == 1 ? product[0].quantity || 0 : "N/A";
+    }
+
     sold_list += `<tr>
             <td>${item.product}</td>
             <td>${item.qty}</td>
-            <td>${
-              product[0].stock == 1
-                ? product.length > 0
-                  ? product[0].quantity
-                  : ""
-                : "N/A"
-            }</td>
+            <td>${stockStatus}</td>
             <td>${
               validator.unescape(settings.symbol) +
               moneyFormat((item.qty * parseFloat(item.price)).toFixed(2))
