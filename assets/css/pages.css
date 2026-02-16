@@ -275,11 +275,9 @@ overflow-y:scroll
 }
 
 .modal-body {
-    max-height: calc(100vh - 143px);
-    overflow: auto; 
+    max-height: calc(100vh - 100px);
+    overflow: hidden; 
   }
-
-
 
   .splash {
   position: fixed;

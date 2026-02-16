@@ -1523,13 +1523,13 @@
       </div>
       <div
         id="settingsModal"
-        class="modal fade bs-example-modal-sm"
+        class="modal fade"
         tabindex="-1"
         role="dialog"
         aria-labelledby="mySmallModalLabel"
         aria-hidden="true"
       >
-        <div class="modal-dialog modal-md">
+        <div class="modal-dialog modal-lg">
           <div class="modal-content">
             <div class="modal-header">
               <button
@@ -1543,10 +1543,10 @@
               <h4 class="modal-title" id="mySmallModalLabel">Settings</h4>
             </div>
             <div class="modal-body">
-              <div class="container">
-                <div class="row">
+              <div class="row m-b-20">
+                <div class="col-md-12">
                   <div class="form-group">
-                    <label for="app">Application</label>
+                    <label for="app">Application Mode</label>
                     <select name="app" id="app" class="form-control">
                       <option value="Standalone Point of Sale">
                         Standalone Point of Sale
@@ -1559,19 +1559,28 @@
                       </option>
                     </select>
                   </div>
-                  <form id="net_settings_form">
-                    <div class="form-group">
-                      <label for="ip">Server IP Address*</label>
-                      <input
-                        type="text"
-                        required="required"
-                        placeholder="Enter the IP address of the admin computer."
-                        name="ip"
-                        class="form-control"
-                        id="ip"
-                      />
+                </div>
+              </div>
+
+              <div id="net_settings">
+                <form id="net_settings_form">
+                  <div class="row">
+                    <div class="col-md-12">
+                      <div class="form-group">
+                        <label for="ip">Server IP Address*</label>
+                        <input
+                          type="text"
+                          required="required"
+                          placeholder="Enter the IP address of the admin computer."
+                          name="ip"
+                          class="form-control"
+                          id="ip"
+                        />
+                      </div>
                     </div>
-                    <div class="col-md-5">
+                  </div>
+                  <div class="row">
+                    <div class="col-md-4">
                       <div class="form-group">
                         <label for="till">Till Number*</label>
                         <input
@@ -1584,9 +1593,9 @@
                         />
                       </div>
                     </div>
-                    <div class="col-md-7">
+                    <div class="col-md-8">
                       <div class="form-group">
-                        <label for="mac">Hardware Identification Number </label>
+                        <label for="mac">Hardware Identification Number</label>
                         <input
                           type="text"
                           required="required"
@@ -1597,163 +1606,168 @@
                         />
                       </div>
                     </div>
+                  </div>
+                  <div class="form-group m-t-10">
+                    <input
+                      id="save_settings_net"
+                      type="submit"
+                      class="btn btn-primary btn-block waves-effect waves-light"
+                      value="Save Network Settings"
+                    />
+                  </div>
+                </form>
+                <hr />
+              </div>
+
+              <form id="settings_form" enctype="multipart/form-data">
+                <input type="hidden" name="id" id="settings_id" />
+                <input type="hidden" name="img" id="logo_img" />
+                <input type="hidden" name="remove" id="remove_logo" />
+                <div class="row">
+                  <div class="col-md-6">
+                    <h4 class="m-t-0 header-title">Store Details</h4>
+                    <hr />
                     <div class="form-group">
+                      <label for="store">Store Name</label>
                       <input
-                        id="save_settings"
-                        type="submit"
-                        class="btn btn-success btn-block waves-effect waves-light"
-                        value="Save Settings"
+                        type="text"
+                        required="required"
+                        name="store"
+                        class="form-control"
+                        id="store"
+                        placeholder="Cool Pharmacy"
                       />
                     </div>
-                  </form>
-                </div>
-                <form id="settings_form" enctype="multipart/form-data">
-                  <input type="hidden" name="id" id="settings_id" />
-                  <input type="hidden" name="img" id="logo_img" />
-                  <input type="hidden" name="remove" id="remove_logo" />
-                  <div class="container">
-                    <div class="row">
-                      <div class="col-md-6">
-                        <div class="form-group">
-                          <label for="userName">Store Name</label>
-                          <input
-                            type="text"
-                            required="required"
-                            name="store"
-                            class="form-control"
-                            id="store"
-                            placeholder="Cool Pharmacy"
-                          />
-                        </div>
-                        <div class="form-group">
-                          <label for="userName">Address Line 1</label>
-                          <input
-                            type="text"
-                            required="required"
-                            name="address_one"
-                            class="form-control"
-                            id="address_one"
-                            placeholder="123 Main Street, Building#"
-                          />
-                        </div>
-                        <div class="form-group">
-                          <label for="userName">Address Line 2</label>
-                          <input
-                            type="text"
-                            required="required"
-                            name="address_two"
-                            class="form-control"
-                            id="address_two"
-                            placeholder="City, Country"
-                          />
-                        </div>
-                        <div class="form-group">
-                          <label for="userName">Contact Number</label>
-                          <input
-                            type="tel"
-                            name="contact"
-                            class="form-control"
-                            id="contact"
-                            placeholder="0800 111 000"
-                          />
-                        </div>
-                        <div class="form-group">
-                          <label for="userName">Vat Number</label>
-                          <input
-                            type="text"
-                            name="tax"
-                            parsley-trigger="change"
-                            class="form-control number-input"
-                            id="tax"
-                          />
-                        </div>
-                      </div>
-                      <div class="col-md-6">
-                        <div class="form-group">
-                          <label for="userName">Currency Symbol</label>
-                          <input
-                            type="text"
-                            required="required"
-                            name="symbol"
-                            class="form-control"
-                            id="symbol"
-                            minlength="1"
-                            maxlength="3"
-                            placeholder="USD"
-                          />
-                        </div>
-                        <div class="form-group">
-                          <label for="userName">Vat Percentage</label>
-                          <div class="pull-left">
-                            <div class="col-md-6">
-                              <div class="input-group" style="width: 130%">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  required="required"
-                                  name="percentage"
-                                  class="form-control"
-                                  id="percentage"
-                                />
-                                <span class="input-group-addon">%</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <br /><br />
-                        <div class="form-group">
-                          <label
-                            ><input
-                              type="checkbox"
-                              name="charge_tax"
-                              id="charge_tax"
-                            />
-                            Charge Vat</label
-                          >
-                        </div>
-                        <div class="form-group">
-                          <label for="userName"
-                            ><span id="rmv_logo" class="btn btn-xs btn-warning"
-                              >Remove</span
-                            >
-                            Logo
-                          </label>
-                          <div id="current_logo"></div>
-                          <input
-                            type="file"
-                            name="imagename"
-                            id="logoname"
-                            accept=".jpg,.jpeg,.png,.webp"
-                          />
-                          <small class="text-gray">
-                            Max filesize: <strong>2MB</strong>; Allowed image
-                            types:<strong>
-                              jpeg, jpg, png or webp</strong
-                            ></small
-                          >
-                        </div>
-                        <div class="form-group">
-                          <label for="userName">Receipt Footer</label>
-                          <textarea
-                            name="footer"
-                            class="form-control"
-                            id="footer"
-                          ></textarea>
-                        </div>
-                      </div>
+                    <div class="form-group">
+                      <label for="address_one">Address Line 1</label>
+                      <input
+                        type="text"
+                        required="required"
+                        name="address_one"
+                        class="form-control"
+                        id="address_one"
+                        placeholder="123 Main Street, Building#"
+                      />
                     </div>
                     <div class="form-group">
+                      <label for="address_two">Address Line 2</label>
                       <input
-                        id="save_settings"
-                        type="submit"
-                        class="btn btn-success btn-block waves-effect waves-light"
-                        value="Save Settings"
+                        type="text"
+                        required="required"
+                        name="address_two"
+                        class="form-control"
+                        id="address_two"
+                        placeholder="City, Country"
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="contact">Contact Number</label>
+                      <input
+                        type="tel"
+                        name="contact"
+                        class="form-control"
+                        id="contact"
+                        placeholder="0800 111 000"
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="tax">Vat Number</label>
+                      <input
+                        type="text"
+                        name="tax"
+                        class="form-control"
+                        id="tax"
                       />
                     </div>
                   </div>
-                </form>
-              </div>
+                  <div class="col-md-6">
+                    <h4 class="m-t-0 header-title">Localization & Logo</h4>
+                    <hr />
+                    <div class="form-group">
+                      <label for="symbol">Currency Symbol</label>
+                      <input
+                        type="text"
+                        required="required"
+                        name="symbol"
+                        class="form-control"
+                        id="symbol"
+                        minlength="1"
+                        maxlength="3"
+                        placeholder="Rs."
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="percentage">Vat Percentage</label>
+                      <div class="input-group">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          required="required"
+                          name="percentage"
+                          class="form-control"
+                          id="percentage"
+                        />
+                        <span class="input-group-addon">%</span>
+                      </div>
+                    </div>
+                    <div class="form-group m-t-20 m-b-20">
+                      <div class="checkbox checkbox-primary">
+                        <input
+                          type="checkbox"
+                          name="charge_tax"
+                          id="charge_tax"
+                        />
+                        <label for="charge_tax"> Charge Vat </label>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label> Logo Management </label>
+                      <div class="m-b-10">
+                        <span id="rmv_logo" class="btn btn-xs btn-danger">
+                          <i class="fa fa-trash"></i> Remove Current
+                        </span>
+                      </div>
+                      <div id="current_logo" class="m-b-10"></div>
+                      <input
+                        type="file"
+                        name="imagename"
+                        id="logoname"
+                        accept=".jpg,.jpeg,.png,.webp"
+                        class="filestyle"
+                      />
+                      <small class="text-muted">
+                        Max 2MB: jpeg, jpg, png, webp
+                      </small>
+                    </div>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-md-12">
+                    <div class="form-group">
+                      <label for="footer">Receipt Footer</label>
+                      <textarea
+                        name="footer"
+                        class="form-control"
+                        id="footer"
+                        rows="3"
+                        placeholder="Thank you for your business!"
+                      ></textarea>
+                    </div>
+                  </div>
+                </div>
+                <div class="row m-t-20">
+                  <div class="col-md-12">
+                    <button
+                      id="save_settings"
+                      type="submit"
+                      class="btn btn-success btn-block btn-lg waves-effect waves-light"
+                    >
+                      Save Settings
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
           </div>
         </div>
