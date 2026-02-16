@@ -1,36 +1,16 @@
 const app = require("express")();
-const server = require("http").Server(app);
 const bodyParser = require("body-parser");
-const Datastore = require("@seald-io/nedb");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 const validator = require("validator");
-const path = require("path");
-const dbPath = path.join(
-  process.env.APPDATA,
-  process.env.APPNAME,
-  "server",
-  "databases",
-  "users.db",
-);
+const { db } = require("./db");
 
 app.use(bodyParser.json());
 
 module.exports = app;
 
-let usersDB = new Datastore({
-  filename: dbPath,
-  autoload: true,
-});
-
-usersDB.ensureIndex({ fieldName: "username", unique: true });
-
 /**
  * GET endpoint: Get the welcome message for the Users API.
- *
- * @param {Object} req request object.
- * @param {Object} res response object.
- * @returns {void}
  */
 app.get("/", function (req, res) {
   res.send("Users API");
@@ -38,166 +18,118 @@ app.get("/", function (req, res) {
 
 /**
  * GET endpoint: Get user details by user ID.
- *
- * @param {Object} req request object with user ID as a parameter.
- * @param {Object} res response object.
- * @returns {void}
  */
 app.get("/user/:userId", function (req, res) {
   if (!req.params.userId) {
     res.status(500).send("ID field is required.");
   } else {
-    usersDB.findOne(
-      {
-        _id: parseInt(req.params.userId),
-      },
-      function (err, docs) {
-        res.send(docs);
-      },
-    );
+    try {
+      const user = db
+        .prepare("SELECT * FROM users WHERE id = ?")
+        .get(parseInt(req.params.userId));
+      res.send(user);
+    } catch (err) {
+      res.status(500).send(err.message);
+    }
   }
 });
 
 /**
  * GET endpoint: Log out a user by updating the user status.
- *
- * @param {Object} req request object with user ID as a parameter.
- * @param {Object} res response object.
- * @returns {void}
  */
 app.get("/logout/:userId", function (req, res) {
   if (!req.params.userId) {
     res.status(500).send("ID field is required.");
   } else {
-    usersDB.update(
-      {
-        _id: parseInt(req.params.userId),
-      },
-      {
-        $set: {
-          status: "Logged Out_" + new Date(),
-        },
-      },
-      {},
-    );
-
-    res.sendStatus(200);
+    try {
+      const status = "Logged Out_" + new Date();
+      db.prepare("UPDATE users SET status = ? WHERE id = ?").run(
+        status,
+        parseInt(req.params.userId),
+      );
+      res.sendStatus(200);
+    } catch (err) {
+      res.status(500).send(err.message);
+    }
   }
 });
 
 /**
  * POST endpoint: Authenticate user login and update user status.
- *
- * @param {Object} req request object with login credentials in the body.
- * @param {Object} res response object.
- * @returns {void}
  */
 app.post("/login", function (req, res) {
-  usersDB.findOne(
-    {
-      username: validator.escape(req.body.username),
-    },
-    function (err, docs) {
-      if (docs) {
-        //verify password
-        bcrypt
-          .compare(req.body.password, docs.password)
-          .then((result) => {
-            if (result) {
-              usersDB.update(
-                {
-                  _id: docs._id,
-                },
-                {
-                  $set: {
-                    status: "Logged In_" + new Date(),
-                  },
-                },
-                {},
-              );
-              res.send({ ...docs, auth: true });
-            }
-            //Invalid password
-            else res.send({ auth: false });
-          })
-          .catch((err) => res.send({ auth: false, message: err.message }));
-      }
-      //No user Account
-      else res.send({ auth: false });
-    },
-  );
+  try {
+    const username = validator.escape(req.body.username);
+    const user = db
+      .prepare("SELECT * FROM users WHERE username = ?")
+      .get(username);
+
+    if (user) {
+      bcrypt
+        .compare(req.body.password, user.password)
+        .then((result) => {
+          if (result) {
+            const status = "Logged In_" + new Date();
+            db.prepare("UPDATE users SET status = ? WHERE id = ?").run(
+              status,
+              user.id,
+            );
+            res.send({ ...user, auth: true });
+          } else {
+            res.send({ auth: false });
+          }
+        })
+        .catch((err) => res.send({ auth: false, message: err.message }));
+    } else {
+      res.send({ auth: false });
+    }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 /**
  * GET endpoint: Get details of all users.
- *
- * @param {Object} req request object.
- * @param {Object} res response object.
- * @returns {void}
  */
 app.get("/all", function (req, res) {
   let limit = parseInt(req.query.limit) || 10;
   let page = parseInt(req.query.page) || 1;
   let skip = (page - 1) * limit;
 
-  usersDB.count({}, function (err, count) {
-    if (err) {
-      res.status(500).send(err);
-    } else {
-      usersDB
-        .find({})
-        .skip(skip)
-        .limit(limit)
-        .exec(function (err, docs) {
-          if (err) {
-            res.status(500).send(err);
-          } else {
-            res.send({ data: docs, total: count });
-          }
-        });
-    }
-  });
+  try {
+    const count = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
+    const users = db
+      .prepare("SELECT * FROM users LIMIT ? OFFSET ?")
+      .all(limit, skip);
+    res.send({ data: users, total: count });
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 /**
  * DELETE endpoint: Delete a user by user ID.
- *
- * @param {Object} req request object with user ID as a parameter.
- * @param {Object} res response object.
- * @returns {void}
  */
 app.delete("/user/:userId", function (req, res) {
-  usersDB.remove(
-    {
-      _id: parseInt(req.params.userId),
-    },
-    function (err, numRemoved) {
-      if (err) {
-        console.error(err);
-        res.status(500).json({
-          error: "Internal Server Error",
-          message: `An unexpected error occurred. ${err}`,
-        });
-      } else {
-        res.sendStatus(200);
-      }
-    },
-  );
+  try {
+    db.prepare("DELETE FROM users WHERE id = ?").run(
+      parseInt(req.params.userId),
+    );
+    res.sendStatus(200);
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", message: err.message });
+  }
 });
 
 /**
  * POST endpoint: Create or update a user.
- *
- * @param {Object} req request object with user data in the body.
- * @param {Object} res response object.
- * @returns {void}
  */
 app.post("/post", function (req, res) {
-  //encrypt password
   bcrypt
     .hash(req.body.password, saltRounds)
     .then((hash) => {
-      req.body.password = hash;
       const perms = [
         "perm_products",
         "perm_categories",
@@ -205,116 +137,99 @@ app.post("/post", function (req, res) {
         "perm_users",
         "perm_settings",
       ];
+      const userData = { ...req.body };
 
       for (const perm of perms) {
-        if (!!req.body[perm]) {
-          req.body[perm] = req.body[perm] === "on" ? 1 : 0;
-        } else {
-          //create missing permission only with new users
-          if (req.body.id === "") {
-            req.body[perm] = 0;
-          }
+        if (userData[perm] !== undefined) {
+          userData[perm] =
+            userData[perm] === "on" || userData[perm] === 1 ? 1 : 0;
+        } else if (userData.id === "") {
+          userData[perm] = 0;
         }
       }
 
-      let User = {
-        ...req.body,
-        status: "",
-      };
-      delete User.id;
-      delete User.pass;
-      if (req.body.id === "") {
-        User._id = Math.floor(Date.now() / 1000);
-        usersDB.insert(User, function (err, user) {
-          if (err) {
-            console.error(err);
-            res.status(500).json({
-              error: "Internal Server Error",
-              message: `An unexpected error occurred. ${err}`,
-            });
-          } else {
-            res.send(user);
-          }
-        });
+      if (userData.id === "") {
+        const id = Math.floor(Date.now() / 1000);
+        try {
+          db.prepare(
+            `
+          INSERT INTO users (id, username, fullname, password, perm_products, perm_categories, perm_transactions, perm_users, perm_settings, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+          ).run(
+            id,
+            userData.username,
+            userData.fullname,
+            hash,
+            userData.perm_products,
+            userData.perm_categories,
+            userData.perm_transactions,
+            userData.perm_users,
+            userData.perm_settings,
+            "",
+          );
+          res.send({ id, ...userData });
+        } catch (err) {
+          res
+            .status(500)
+            .json({ error: "Internal Server Error", message: err.message });
+        }
       } else {
-        usersDB.update(
-          {
-            _id: parseInt(req.body.id),
-          },
-          {
-            $set: User,
-          },
-          {},
-          function (err, numReplaced, user) {
-            if (err) {
-              console.error(err);
-              res.status(500).json({
-                error: "Internal Server Error",
-                message: `An unexpected error occurred. ${err}`,
-              });
-            } else {
-              res.sendStatus(200);
-            }
-          },
-        );
+        try {
+          db.prepare(
+            `
+          UPDATE users SET 
+            username = ?, fullname = ?, password = ?, 
+            perm_products = ?, perm_categories = ?, perm_transactions = ?, 
+            perm_users = ?, perm_settings = ?
+          WHERE id = ?
+        `,
+          ).run(
+            userData.username,
+            userData.fullname,
+            hash,
+            userData.perm_products,
+            userData.perm_categories,
+            userData.perm_transactions,
+            userData.perm_users,
+            userData.perm_settings,
+            parseInt(userData.id),
+          );
+          res.sendStatus(200);
+        } catch (err) {
+          res
+            .status(500)
+            .json({ error: "Internal Server Error", message: err.message });
+        }
       }
     })
-    .catch((err) => {
-      console.error(err);
-      res.status(500).json({
-        error: "Internal Server Error",
-        message: `An unexpected error occurred. ${err}`,
-      });
-    });
+    .catch((err) =>
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: err.message }),
+    );
 });
 
 /**
  * GET endpoint: Check and initialize the default admin user if not exists.
- *
- * @param {Object} req request object.
- * @param {Object} res response object.
- * @returns {void}
  */
 app.get("/check", function (req, res) {
-  usersDB.findOne(
-    {
-      _id: 1,
-    },
-    function (err, docs) {
-      if (!docs) {
-        bcrypt
-          .hash("admin", saltRounds)
-          .then((hash) => {
-            let user = {
-              _id: 1,
-              username: "admin",
-              fullname: "Administrator",
-              perm_products: 1,
-              perm_categories: 1,
-              perm_transactions: 1,
-              perm_users: 1,
-              perm_settings: 1,
-              status: "",
-            };
-            user.password = hash;
-            usersDB.insert(user, function (err, user) {
-              if (err) {
-                console.error(err);
-                res.status(500).json({
-                  error: "Internal Server Error",
-                  message: `An unexpected error occurred. ${err}`,
-                });
-              }
-            });
-          })
-          .catch((err) => {
-            console.error(err);
-            res.sendStatus(500).json({
-              error: "Internal Server Error",
-              message: `An unexpected error occurred. ${err}`,
-            });
-          });
-      }
-    },
-  );
+  try {
+    const admin = db.prepare("SELECT * FROM users WHERE id = 1").get();
+    if (!admin) {
+      bcrypt.hash("admin", saltRounds).then((hash) => {
+        db.prepare(
+          `
+          INSERT INTO users (id, username, fullname, password, perm_products, perm_categories, perm_transactions, perm_users, perm_settings, status)
+          VALUES (1, 'admin', 'Administrator', ?, 1, 1, 1, 1, 1, '')
+        `,
+        ).run(hash);
+      });
+    }
+    res.sendStatus(200);
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", message: err.message });
+  }
 });
