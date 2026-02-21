@@ -31,23 +31,22 @@ $(document).ready(function () {
     $(this).calculateChange();
   };
 
-  /**
-   * Calculate and display the balance due.
-   */
-  debugger;
   $.fn.calculateChange = function () {
-    var payablePrice = $("#payablePrice").val().replace(",", "");
-    var payment = $("#payment").val().replace(",", "");
-    var change = payablePrice - payment;
+    var payablePrice = ($("#payablePrice").val() || "").replace(",", "");
+    var payment = ($("#payment").val() || "").replace(",", "");
+
+    var price = parseFloat(payablePrice) || 0;
+    var paid = parseFloat(payment) || 0;
+
+    var change = price - paid;
     if (change <= 0) {
-      $("#change").text(utils.moneyFormat(Math.abs(change.toFixed(2))));
+      $("#change").text(utils.moneyFormat(Math.abs(change).toFixed(2)));
       $("#confirmPayment").show();
     } else {
-      $("#change").text("0");
+      $("#change").text("0.00");
       $("#confirmPayment").hide();
     }
   };
-  debugger;
   var $keypadBtn = $(".keypad-btn").on("click", function () {
     const key = $(this).data("val");
     const isdue = $(this).data("isdue");

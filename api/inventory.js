@@ -87,14 +87,18 @@ app.post("/product", function (req, res) {
     let generic = req.body.generic
       ? validator.escape(req.body.generic.toString())
       : "";
+    let strength = req.body.strength
+      ? validator.escape(req.body.strength.toString())
+      : "";
+    let form = req.body.form ? validator.escape(req.body.form.toString()) : "";
     let stock = req.body.stock === "on" ? 0 : 1;
 
     if (id === "") {
       const newId = Math.floor(Date.now() / 1000);
       db.prepare(
         `
-        INSERT INTO inventory (id, name, generic, category, price, quantity, minStock, expirationDate, stock)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO inventory (id, name, generic, category, price, quantity, minStock, expirationDate, stock, strength, form)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       ).run(
         newId,
@@ -106,6 +110,8 @@ app.post("/product", function (req, res) {
         minStock,
         expirationDate,
         stock,
+        strength,
+        form,
       );
       res.sendStatus(200);
     } else {
@@ -114,7 +120,7 @@ app.post("/product", function (req, res) {
         UPDATE inventory SET 
           name = ?, generic = ?, category = ?, 
           price = ?, quantity = ?, minStock = ?, 
-          expirationDate = ?, stock = ?
+          expirationDate = ?, stock = ?, strength = ?, form = ?
         WHERE id = ?
       `,
       ).run(
@@ -126,6 +132,8 @@ app.post("/product", function (req, res) {
         minStock,
         expirationDate,
         stock,
+        strength,
+        form,
         parseInt(id),
       );
       res.sendStatus(200);

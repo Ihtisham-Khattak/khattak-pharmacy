@@ -94,14 +94,14 @@ app.delete("/customer/:customerId", function (req, res) {
  */
 app.put("/customer", function (req, res) {
   try {
-    const { _id, name, phone, email, address } = req.body;
+    const { id, name, phone, email, address } = req.body;
     db.prepare(
       `
       UPDATE customers SET 
         name = ?, phone = ?, email = ?, address = ?
       WHERE id = ?
     `,
-    ).run(name, phone, email, address, parseInt(_id));
+    ).run(name, phone, email, address, parseInt(id));
     res.sendStatus(200);
   } catch (err) {
     res

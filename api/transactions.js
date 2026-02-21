@@ -102,11 +102,11 @@ app.post("/new", function (req, res) {
     const t = req.body;
     db.prepare(
       `
-      INSERT INTO transactions (id, date, user_id, till, status, total, paid, change, customer_id, ref_number, items)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO transactions (id, date, user_id, till, status, total, paid, change, customer_id, ref_number, items, payment_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     ).run(
-      t._id.toString(),
+      t._id ? t._id.toString() : "",
       t.date,
       t.user_id,
       t.till,
@@ -117,6 +117,7 @@ app.post("/new", function (req, res) {
       t.customer_id || 0,
       t.ref_number || "",
       JSON.stringify(t.items),
+      t.payment_type || "Cash",
     );
 
     if (t.paid >= t.total) {
@@ -141,7 +142,8 @@ app.put("/new", function (req, res) {
       UPDATE transactions SET 
         date = ?, user_id = ?, till = ?, status = ?, 
         total = ?, paid = ?, change = ?, 
-        customer_id = ?, ref_number = ?, items = ?
+        customer_id = ?, ref_number = ?, items = ?,
+        payment_type = ?
       WHERE id = ?
     `,
     ).run(
@@ -155,7 +157,8 @@ app.put("/new", function (req, res) {
       t.customer_id || 0,
       t.ref_number || "",
       JSON.stringify(t.items),
-      t._id.toString(),
+      t.payment_type || "Cash",
+      t._id ? t._id.toString() : "",
     );
     res.sendStatus(200);
   } catch (err) {

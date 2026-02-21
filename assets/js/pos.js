@@ -62,8 +62,8 @@ let platform;
 let user = {};
 let start = moment().startOf("month");
 let end = moment();
-let start_date = moment(start).toDate();
-let end_date = moment(end).toDate();
+let start_date = moment(start).toDate().toJSON();
+let end_date = moment(end).toDate().toJSON();
 let by_till = 0;
 let by_user = 0;
 let by_status = 1;
@@ -236,7 +236,7 @@ if (auth == undefined) {
     }
   }
 
-  $.get(api + "users/user/" + user._id, function (data) {
+  $.get(api + "users/user/" + user.id, function (data) {
     user = data;
     $("#loggedin-user").text(user.fullname);
   });
@@ -252,7 +252,7 @@ if (auth == undefined) {
   $(document).ready(function () {
     //update title based on company
     let appTitle = !!settings
-      ? `${validator.unescape(settings.store)} - ${appName}`
+      ? `${validator.unescape(String(settings.store))} - ${appName}`
       : appName;
     $("title").text(appTitle);
 
@@ -292,9 +292,9 @@ if (auth == undefined) {
       }, 300);
     });
 
-    if (settings && validator.unescape(settings.symbol)) {
+    if (settings && validator.unescape(String(settings.symbol))) {
       $("#price_curr, #payment_curr, #change_curr").text(
-        validator.unescape(settings.symbol),
+        validator.unescape(String(settings.symbol)),
       );
     }
 
@@ -302,7 +302,7 @@ if (auth == undefined) {
       if (settings == undefined && auth != undefined) {
         $("#settingsModal").modal("show");
       } else {
-        vat = parseFloat(validator.unescape(settings.percentage));
+        vat = parseFloat(validator.unescape(String(settings.percentage)));
         $("#taxInfo").text(settings.charge_tax ? vat : 0);
       }
     }, 1500);
@@ -405,7 +405,7 @@ if (auth == undefined) {
 
           let row = `<tr>
               <td>${item.generic && item.generic !== "undefined" ? item.generic : item.name}</td>
-              <td><span class="${item_isExpired ? "text-danger" : ""}">${item.name}</span> <br><small class="sku">${item._id}</small></td>
+              <td><span class="${item_isExpired ? "text-danger" : ""}">${item.name}</span> <br><small class="sku">${item.id}</small></td>
               <td>${validator.unescape(settings.symbol) + moneyFormat(item.price)}</td>
               <td>
                   <span class="${item_stockStatus < 1 ? "text-danger" : ""}">${
@@ -413,7 +413,7 @@ if (auth == undefined) {
                   }</span>
               </td>
               <td>
-                  <button class="btn btn-primary btn-sm" onclick="$(this).addToCart(${item._id}, ${item.quantity}, ${item.stock})">
+                  <button class="btn btn-primary btn-sm" onclick="$(this).addToCart(${item.id}, ${item.quantity}, ${item.stock})">
                       <i class="fa fa-shopping-cart"></i> Add
                   </button>
               </td>
@@ -432,7 +432,7 @@ if (auth == undefined) {
         $("#category,#categories").html(`<option value="0">Select</option>`);
         allCategories.forEach((category) => {
           $("#category,#categories").append(
-            `<option value="${category._id}">${category.name}</option>`,
+            `<option value="${category.id}">${category.name}</option>`,
           );
         });
       });
@@ -478,7 +478,7 @@ if (auth == undefined) {
 
     $.fn.addProductToCart = function (data) {
       item = {
-        id: data._id,
+        id: data.id,
         product_name: data.name,
         sku: data.sku,
         price: data.price,
@@ -689,278 +689,304 @@ if (auth == undefined) {
     }
 
     $.fn.submitDueOrder = function (status) {
-      let items = "";
-      let payment = 0;
-      paymentType = $(".list-group-item.active").data("payment-type");
-      cart.forEach((item) => {
-        items += `<tr><td>${DOMPurify.sanitize(item.product_name)}</td><td>${DOMPurify.sanitize(
-          item.quantity,
-        )} </td><td class="text-right"> ${DOMPurify.sanitize(validator.unescape(settings.symbol))} ${moneyFormat(
-          DOMPurify.sanitize(Math.abs(item.price).toFixed(2)),
-        )} </td></tr>`;
-      });
-
-      let currentTime = new Date(moment());
-      let discount = $("#inputDiscount").val();
-      // CUSTOMER DROPDOWN - COMMENTED OUT, defaulting to walk-in customer
-      // let customer = JSON.parse($("#customer").val());
-      let customer = 0; // Default to walk-in customer
-      let date = moment(currentTime).format("YYYY-MM-DD HH:mm:ss");
-      let paymentAmount = $("#payment").val().replace(",", "");
-      let changeAmount = $("#change").text().replace(",", "");
-      let paid =
-        $("#payment").val() == "" ? "" : parseFloat(paymentAmount).toFixed(2);
-      let change =
-        $("#change").text() == "" ? "" : parseFloat(changeAmount).toFixed(2);
-      let refNumber = $("#refNumber").val();
-      let orderNumber = holdOrder;
-      let type = "";
-      let tax_row = "";
-      switch (paymentType) {
-        case 1:
-          type = "Cash";
-          break;
-        case 3:
-          type = "Card";
-          break;
-      }
-
-      if (paid != "") {
-        payment = `<tr>
-                        <td>Paid</td>
-                        <td>:</td>
-                        <td class="text-right">${validator.unescape(settings.symbol)} ${moneyFormat(
-                          Math.abs(paid).toFixed(2),
-                        )}</td>
-                    </tr>
-                    <tr>
-                        <td>Change</td>
-                        <td>:</td>
-                        <td class="text-right">${validator.unescape(settings.symbol)} ${moneyFormat(
-                          Math.abs(change).toFixed(2),
-                        )}</td>
-                    </tr>
-                    <tr>
-                        <td>Method</td>
-                        <td>:</td>
-                        <td class="text-right">${type}</td>
-                    </tr>`;
-      }
-
-      if (settings.charge_tax) {
-        tax_row = `<tr>
-                    <td>VAT(${validator.unescape(settings.percentage)})% </td>
-                    <td>:</td>
-                    <td class="text-right">${validator.unescape(settings.symbol)} ${moneyFormat(
-                      parseFloat(totalVat).toFixed(2),
-                    )}</td>
-                </tr>`;
-      }
-
-      // CUSTOMER DROPDOWN - COMMENTED OUT, validation adjusted for walk-in customer only
-      if (status == 0) {
-        if ($("#refNumber").val() == "") {
-          notiflix.Report.warning(
-            "Reference Required!",
-            "You need to enter a reference for hold orders!",
-            "Ok",
-          );
-          return;
-        }
-      }
-
-      $(".loading").show();
-
-      if (holdOrder != 0) {
-        orderNumber = holdOrder;
-        method = "PUT";
-      } else {
-        orderNumber = Math.floor(Date.now() / 1000);
-        method = "POST";
-      }
-
-      logo = path.join(img_path, validator.unescape(settings.img));
-
-      receipt = `<div style="font-family: 'Helvetica Neue', sans-serif; font-size: 12px; width: 100%; color: #333;">
-        <div style="text-align: center; margin-bottom: 10px;">
-            ${
-              checkFileExists(logo)
-                ? `<img style='max-width: 80px; margin-bottom: 5px;' src='${logo}' /><br>`
-                : ``
-            }
-            <h3 style="margin: 0; font-size: 18px; font-weight: bold;">${validator.unescape(settings.store)}</h3>
-            <p style="margin: 2px 0;">${validator.unescape(settings.address_one)}</p>
-            <p style="margin: 2px 0;">${validator.unescape(settings.address_two)}</p>
-            <p style="margin: 2px 0;">${
-              validator.unescape(settings.contact) != ""
-                ? "Tel: " + validator.unescape(settings.contact)
-                : ""
-            }</p>
-            <p style="margin: 2px 0;">${
-              validator.unescape(settings.tax) != ""
-                ? "Vat No: " + validator.unescape(settings.tax)
-                : ""
-            }</p>
-        </div>
-        
-        <div style="border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 5px 0; margin-bottom: 10px;">
-            <table style="width: 100%; font-size: 11px;">
-                <tr>
-                    <td><strong>Order:</strong> ${orderNumber}</td>
-                    <td style="text-align: right;"><strong>Date:</strong> ${date}</td>
-                </tr>
-                <tr>
-                    <td><strong>Cashier:</strong> ${user.fullname}</td>
-                    <td style="text-align: right;"><strong>Ref:</strong> ${refNumber == "" ? orderNumber : _.escape(refNumber)}</td>
-                </tr>
-                <tr>
-                    <td colspan="2"><strong>Customer:</strong> ${
-                      customer == 0
-                        ? "Walk in customer"
-                        : _.escape(customer.name)
-                    }</td>
-                </tr>
-            </table>
-        </div>
-
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
-            <thead>
-                <tr style="border-bottom: 1px solid #000;">
-                    <th style="text-align: left; padding: 5px 0;">Item</th>
-                    <th style="text-align: center; padding: 5px 0;">Qty</th>
-                    <th style="text-align: right; padding: 5px 0;">Price</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${items}
-            </tbody>
-        </table>
-
-        <div style="border-top: 1px solid #000; padding-top: 5px;">
-            <table style="width: 100%; font-size: 12px;">
-                <tr>
-                    <td style="padding-top: 5px;">Subtotal:</td>
-                    <td style="text-align: right; padding-top: 5px;">${validator.unescape(settings.symbol)}${moneyFormat(subTotal.toFixed(2))}</td>
-                </tr>
-                ${
-                  discount > 0
-                    ? `<tr>
-                        <td>Discount:</td>
-                        <td style="text-align: right;">${validator.unescape(settings.symbol) + moneyFormat(parseFloat(discount).toFixed(2))}</td>
-                       </tr>`
-                    : ""
-                }
-                ${tax_row ? tax_row.replace(/<tr>/g, '<tr style="font-size: 11px; color: #666;">') : ""}
-                <tr style="font-weight: bold; font-size: 14px;">
-                    <td style="padding-top: 5px; border-top: 1px dashed #ccc;">Total:</td>
-                    <td style="text-align: right; padding-top: 5px; border-top: 1px dashed #ccc;">${validator.unescape(settings.symbol)}${moneyFormat(parseFloat(orderTotal).toFixed(2))}</td>
-                </tr>
-                 ${
-                   payment != 0
-                     ? `<tr>
-                        <td style="padding-top: 5px;">Paid:</td>
-                        <td style="text-align: right; padding-top: 5px;">${payment
-                          .replace(/<td class="text-right">/g, "")
-                          .replace(/<\/td>/g, "")
-                          .replace(/<td>/g, "")
-                          .replace(/<b>/g, "")
-                          .replace(/<\/b>/g, "")}</td> 
-                       </tr>`
-                     : ""
-                 }
-                 ${
-                   change > 0
-                     ? `<tr>
-                        <td>Change:</td>
-                        <td style="text-align: right;">${validator.unescape(settings.symbol)}${moneyFormat(parseFloat(change).toFixed(2))}</td>
-                       </tr>`
-                     : ""
-                 }
-            </table>
-        </div>
-
-        <div style="text-align: center; margin-top: 15px; font-size: 11px; color: #666;">
-            <p>${validator.unescape(settings.footer)}</p>
-            <p>Thank you for purchasing!</p>
-            <p>For inquiries, contact: ${validator.unescape(settings.contact)}</p>
-        </div>
-      </div>`;
-
-      if (status == 3) {
-        if (cart.length > 0) {
-          printJS({ printable: receipt, type: "raw-html" });
-
-          $(".loading").hide();
-          return;
-        } else {
-          $(".loading").hide();
-          return;
-        }
-      }
-
-      let data = {
-        order: orderNumber,
-        ref_number: refNumber,
-        discount: discount,
-        customer: customer,
-        status: status,
-        subtotal: parseFloat(subTotal).toFixed(2),
-        tax: totalVat,
-        order_type: 1,
-        items: cart,
-        date: currentTime,
-        payment_type: type,
-        payment_info: $("#paymentInfo").val(),
-        total: orderTotal,
-        paid: paid,
-        change: change,
-        _id: orderNumber,
-        till: platform.till,
-        mac: platform.mac,
-        user: user.fullname,
-        user_id: user._id,
-      };
-
-      $.ajax({
-        url: api + "new",
-        type: method,
-        data: JSON.stringify(data),
-        contentType: "application/json; charset=utf-8",
-        cache: false,
-        processData: false,
-        success: function (data) {
-          cart = [];
-          receipt = DOMPurify.sanitize(receipt, {
-            ALLOW_UNKNOWN_PROTOCOLS: true,
-          });
-          $("#viewTransaction").html("");
-          $("#viewTransaction").html(receipt);
-          $("#orderModal").modal("show");
-          loadProducts();
-          // CUSTOMER DROPDOWN - COMMENTED OUT (fixes infinite loader bug)
-          // loadCustomers();
-          $(".loading").hide();
-          $("#dueModal").modal("hide");
-          $("#paymentModel").modal("hide");
-          $(this).getHoldOrders();
-          $(this).getCustomerOrders();
-          $(this).renderTable(cart);
-        },
-
-        error: function (data) {
-          $(".loading").hide();
-          $("#dueModal").modal("toggle");
+      try {
+        if (!settings || !platform) {
+          console.error("Settings or Platform data missing");
           notiflix.Report.failure(
-            "Something went wrong!",
-            "Please refresh this page and try again",
+            "Missing Configuration",
+            "Application settings are not loaded. Please refresh the page.",
             "Ok",
           );
-        },
-      });
+          return;
+        }
 
-      $("#refNumber").val("");
-      $("#change").text("");
-      $("#payment,#paymentText").val("");
+        let items = "";
+        let payment = 0;
+        let p_type = $(".list-group-item.active").data("payment-type") || 1; // Fallback to 1 (Cash)
+
+        cart.forEach((item) => {
+          items += `<tr><td>${DOMPurify.sanitize(item.product_name)}</td><td>${DOMPurify.sanitize(
+            item.quantity,
+          )} </td><td class="text-right"> ${DOMPurify.sanitize(validator.unescape(String(settings.symbol || "$")))} ${moneyFormat(
+            DOMPurify.sanitize(Math.abs(item.price).toFixed(2)),
+          )} </td></tr>`;
+        });
+
+        let currentTime = new Date(moment());
+        let discount = $("#inputDiscount").val() || 0;
+        let customer = 0; // Default to walk-in customer
+        let date = moment(currentTime).format("YYYY-MM-DD HH:mm:ss");
+        let paymentAmount = ($("#payment").val() || "0").replace(",", "");
+        let changeAmount = ($("#change").text() || "0").replace(",", "");
+        let paid =
+          $("#payment").val() == ""
+            ? "0.00"
+            : parseFloat(paymentAmount).toFixed(2);
+        let change =
+          $("#change").text() == ""
+            ? "0.00"
+            : parseFloat(changeAmount).toFixed(2);
+        let refNumber = $("#refNumber").val() || "";
+        let orderNumber = holdOrder;
+        let type = "";
+        let tax_row = "";
+
+        switch (p_type) {
+          case 1:
+            type = "Cash";
+            break;
+          case 3:
+            type = "Card";
+            break;
+          default:
+            type = "Cash";
+        }
+
+        if (paid != "") {
+          payment = `<tr>
+                          <td>Paid</td>
+                          <td>:</td>
+                          <td class="text-right">${validator.unescape(String(settings.symbol || "$"))} ${moneyFormat(
+                            Math.abs(paid).toFixed(2),
+                          )}</td>
+                      </tr>
+                      <tr>
+                          <td>Change</td>
+                          <td>:</td>
+                          <td class="text-right">${validator.unescape(String(settings.symbol || "$"))} ${moneyFormat(
+                            Math.abs(change).toFixed(2),
+                          )}</td>
+                      </tr>
+                      <tr>
+                          <td>Method</td>
+                          <td>:</td>
+                          <td class="text-right">${type}</td>
+                      </tr>`;
+        }
+
+        if (settings.charge_tax) {
+          tax_row = `<tr>
+                      <td>VAT(${validator.unescape(String(settings.percentage || "0"))})% </td>
+                      <td>:</td>
+                      <td class="text-right">${validator.unescape(String(settings.symbol || "$"))} ${moneyFormat(
+                        parseFloat(totalVat || 0).toFixed(2),
+                      )}</td>
+                  </tr>`;
+        }
+
+        if (status == 0) {
+          if ($("#refNumber").val() == "") {
+            notiflix.Report.warning(
+              "Reference Required!",
+              "You need to enter a reference for hold orders!",
+              "Ok",
+            );
+            return;
+          }
+        }
+
+        $(".loading").show();
+
+        if (holdOrder != 0) {
+          orderNumber = holdOrder;
+          method = "PUT";
+        } else {
+          orderNumber = Math.floor(Date.now() / 1000);
+          method = "POST";
+        }
+
+        let logo = settings.img
+          ? path.join(img_path, validator.unescape(String(settings.img)))
+          : "";
+
+        receipt = `<div style="font-family: 'Helvetica Neue', sans-serif; font-size: 12px; width: 100%; color: #333;">
+          <div style="text-align: center; margin-bottom: 10px;">
+              ${
+                logo && checkFileExists(logo)
+                  ? `<img style='max-width: 80px; margin-bottom: 5px;' src='${logo}' /><br>`
+                  : ``
+              }
+              <h3 style="margin: 0; font-size: 18px; font-weight: bold;">${validator.unescape(String(settings.store || "PharmaSpot"))}</h3>
+              <p style="margin: 2px 0;">${validator.unescape(String(settings.address_one || ""))}</p>
+              <p style="margin: 2px 0;">${validator.unescape(String(settings.address_two || ""))}</p>
+              <p style="margin: 2px 0;">${
+                validator.unescape(String(settings.contact || "")) != ""
+                  ? "Tel: " + validator.unescape(String(settings.contact))
+                  : ""
+              }</p>
+              <p style="margin: 2px 0;">${
+                validator.unescape(String(settings.tax || "")) != ""
+                  ? "Vat No: " + validator.unescape(String(settings.tax))
+                  : ""
+              }</p>
+          </div>
+          
+          <div style="border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 5px 0; margin-bottom: 10px;">
+              <table style="width: 100%; font-size: 11px;">
+                  <tr>
+                      <td><strong>Order:</strong> ${orderNumber}</td>
+                      <td style="text-align: right;"><strong>Date:</strong> ${date}</td>
+                  </tr>
+                  <tr>
+                      <td><strong>Cashier:</strong> ${user.fullname || "User"}</td>
+                      <td style="text-align: right;"><strong>Ref:</strong> ${refNumber == "" ? orderNumber : _.escape(refNumber)}</td>
+                  </tr>
+                  <tr>
+                      <td colspan="2"><strong>Customer:</strong> ${
+                        customer == 0
+                          ? "Walk in customer"
+                          : _.escape(customer.name)
+                      }</td>
+                  </tr>
+              </table>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+              <thead>
+                  <tr style="border-bottom: 1px solid #000;">
+                      <th style="text-align: left; padding: 5px 0;">Item</th>
+                      <th style="text-align: center; padding: 5px 0;">Qty</th>
+                      <th style="text-align: right; padding: 5px 0;">Price</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  ${items}
+              </tbody>
+          </table>
+
+          <div style="border-top: 1px solid #000; padding-top: 5px;">
+              <table style="width: 100%; font-size: 12px;">
+                  <tr>
+                      <td style="padding-top: 5px;">Subtotal:</td>
+                      <td style="text-align: right; padding-top: 5px;">${validator.unescape(String(settings.symbol || "$"))}${moneyFormat((subTotal || 0).toFixed(2))}</td>
+                  </tr>
+                  ${
+                    discount > 0
+                      ? `<tr>
+                          <td>Discount:</td>
+                          <td style="text-align: right;">${validator.unescape(String(settings.symbol || "$")) + moneyFormat(parseFloat(discount).toFixed(2))}</td>
+                         </tr>`
+                      : ""
+                  }
+                  ${tax_row ? tax_row.replace(/<tr>/g, '<tr style="font-size: 11px; color: #666;">') : ""}
+                  <tr style="font-weight: bold; font-size: 14px;">
+                      <td style="padding-top: 5px; border-top: 1px dashed #ccc;">Total:</td>
+                      <td style="text-align: right; padding-top: 5px; border-top: 1px dashed #ccc;">${validator.unescape(String(settings.symbol || "$"))}${moneyFormat(parseFloat(orderTotal || 0).toFixed(2))}</td>
+                  </tr>
+                   ${
+                     payment != 0
+                       ? `<tr>
+                          <td style="padding-top: 5px;">Paid:</td>
+                          <td style="text-align: right; padding-top: 5px;">${payment
+                            .replace(/<td class="text-right">/g, "")
+                            .replace(/<\/td>/g, "")
+                            .replace(/<td>/g, "")
+                            .replace(/<b>/g, "")
+                            .replace(/<\/b>/g, "")}</td> 
+                         </tr>`
+                       : ""
+                   }
+                   ${
+                     change > 0
+                       ? `<tr>
+                          <td>Change:</td>
+                          <td style="text-align: right;">${validator.unescape(String(settings.symbol || "$"))}${moneyFormat(parseFloat(change).toFixed(2))}</td>
+                         </tr>`
+                       : ""
+                   }
+              </table>
+          </div>
+
+          <div style="text-align: center; margin-top: 15px; font-size: 11px; color: #666;">
+              <p>${validator.unescape(String(settings.footer || "Thank you!"))}</p>
+              <p>Thank you for purchasing!</p>
+              <p>For inquiries, contact: ${validator.unescape(String(settings.contact || ""))}</p>
+          </div>
+        </div>`;
+
+        if (status == 3) {
+          if (cart.length > 0) {
+            printJS({ printable: receipt, type: "raw-html" });
+
+            $(".loading").hide();
+            return;
+          } else {
+            $(".loading").hide();
+            return;
+          }
+        }
+
+        let data = {
+          order: orderNumber,
+          ref_number: refNumber,
+          discount: discount,
+          customer: customer,
+          status: status,
+          subtotal: parseFloat(subTotal || 0).toFixed(2),
+          tax: totalVat || 0,
+          order_type: 1,
+          items: cart,
+          date: currentTime,
+          payment_type: type,
+          payment_info: $("#paymentInfo").val(),
+          total: orderTotal || 0,
+          paid: paid,
+          change: change,
+          _id: orderNumber,
+          id: orderNumber,
+          till: platform.till,
+          mac: platform.mac,
+          user: user.fullname,
+          user_id: user.id,
+        };
+
+        $.ajax({
+          url: api + "new",
+          type: method,
+          data: JSON.stringify(data),
+          contentType: "application/json; charset=utf-8",
+          cache: false,
+          processData: false,
+          success: function (data) {
+            cart = [];
+            receipt = DOMPurify.sanitize(receipt, {
+              ALLOW_UNKNOWN_PROTOCOLS: true,
+            });
+            $("#viewTransaction").html("");
+            $("#viewTransaction").html(receipt);
+            $("#orderModal").modal("show");
+            loadProducts();
+            $(".loading").hide();
+            $("#dueModal").modal("hide");
+            $("#paymentModel").modal("hide");
+            $.fn.getHoldOrders();
+            $.fn.getCustomerOrders();
+            $.fn.renderTable(cart);
+          },
+
+          error: function (data) {
+            $(".loading").hide();
+            $("#dueModal").modal("toggle");
+            notiflix.Report.failure(
+              "Something went wrong!",
+              "Please refresh this page and try again",
+              "Ok",
+            );
+          },
+        });
+
+        $("#refNumber").val("");
+        $("#change").text("");
+        $("#payment,#paymentText").val("");
+      } catch (err) {
+        console.error("Critical error in submitDueOrder:", err);
+        $(".loading").hide();
+        notiflix.Report.failure(
+          "Checkout Error",
+          "An unexpected error occurred: " + err.message,
+          "Ok",
+        );
+      }
     };
 
     $.get(api + "on-hold", function (data) {
@@ -975,13 +1001,13 @@ if (auth == undefined) {
         holdOrderList = data;
         clearInterval(dotInterval);
         holdOrderlocation.empty();
-        $(this).renderHoldOrders(holdOrderList, holdOrderlocation, 1);
+        $.fn.renderHoldOrders(holdOrderList, holdOrderlocation, 1);
       });
     };
 
     $.fn.renderHoldOrders = function (data, renderLocation, orderType) {
       $.each(data, function (index, order) {
-        $(this).calculatePrice(order);
+        $.fn.calculatePrice(order);
         renderLocation.append(
           $("<div>", {
             class:
@@ -1031,13 +1057,13 @@ if (auth == undefined) {
     };
 
     $.fn.calculatePrice = function (data) {
-      totalPrice = 0;
-      $.each(data.products, function (index, product) {
-        totalPrice += product.price * product.quantity;
+      let price = 0;
+      $.each(data.items, function (index, product) {
+        price += product.price * product.quantity;
       });
 
-      let vat = (totalPrice * data.vat) / 100;
-      totalPrice = (totalPrice + vat - data.discount).toFixed(0);
+      let vat = (price * data.vat) / 100;
+      totalPrice = (price + vat - data.discount).toFixed(0);
 
       return totalPrice;
     };
@@ -1057,7 +1083,7 @@ if (auth == undefined) {
         //   })
         //   .prop("selected", true);
 
-        holdOrder = holdOrderList[index]._id;
+        holdOrder = holdOrderList[index].id;
         cart = [];
         $.each(holdOrderList[index].items, function (index, product) {
           item = {
@@ -1080,7 +1106,7 @@ if (auth == undefined) {
           })
           .prop("selected", true);
 
-        holdOrder = customerOrderList[index]._id;
+        holdOrder = customerOrderList[index].id;
         cart = [];
         $.each(customerOrderList[index].items, function (index, product) {
           item = {
@@ -1101,10 +1127,10 @@ if (auth == undefined) {
     $.fn.deleteOrder = function (index, type) {
       switch (type) {
         case 1:
-          deleteId = holdOrderList[index]._id;
+          deleteId = holdOrderList[index].id;
           break;
         case 2:
-          deleteId = customerOrderList[index]._id;
+          deleteId = customerOrderList[index].id;
       }
 
       let data = {
@@ -1164,7 +1190,7 @@ if (auth == undefined) {
       e.preventDefault();
 
       let custData = {
-        _id: Math.floor(Date.now() / 1000),
+        id: Math.floor(Date.now() / 1000),
         name: $("#userName").val(),
         phone: $("#phoneNumber").val(),
         email: $("#emailAddress").val(),
@@ -1189,13 +1215,13 @@ if (auth == undefined) {
           $("#customer").append(
             $("<option>", {
               text: custData.name,
-              value: `{"id": ${custData._id}, "name": ${custData.name}}`,
+              value: `{"id": ${custData.id}, "name": "${custData.name}"}`,
               selected: "selected",
             }),
           );
 
           $("#customer")
-            .val(`{"id": ${custData._id}, "name": ${custData.name}}`)
+            .val(`{"id": ${custData.id}, "name": "${custData.name}"}`)
             .trigger("chosen:updated");
         },
         error: function (data) {
@@ -1365,7 +1391,9 @@ if (auth == undefined) {
         $("#expirationDate").val(product.expirationDate);
         $("#minStock").val(product.minStock || 1);
         $("#productGeneric").val(product.generic);
-        $("#product_id").val(product._id);
+        $("#strength").val(product.strength);
+        $("#form").val(product.form);
+        $("#product_id").val(product.id);
 
         if (product.stock == 0) {
           $("#stock").prop("checked", true);
@@ -1384,7 +1412,7 @@ if (auth == undefined) {
       $.get(api + "users/user/" + id, function (user) {
         $(".perms").show();
 
-        $("#user_id").val(user._id);
+        $("#user_id").val(user.id);
         $("#fullname").val(user.fullname);
         $("#username").val(validator.unescape(user.username));
         $("#password").attr("placeholder", "New Password");
@@ -1406,7 +1434,7 @@ if (auth == undefined) {
       $("#Categories").modal("hide");
       $.get(api + "categories/category/" + id, function (category) {
         $("#categoryName").val(category.name);
-        $("#category_id").val(category._id);
+        $("#category_id").val(category.id);
         $("#newCategory").modal("show");
       });
     };
@@ -1544,12 +1572,12 @@ if (auth == undefined) {
               state.length > 0 ? login_status : ""
             } <br><small> ${state.length > 0 ? login_time : ""}</small></td>
             <td>${
-              user._id == 1
+              user.id == 1
                 ? '<span class="btn-group"><button class="btn btn-dark"><i class="fa fa-edit"></i></button><button class="btn btn-dark"><i class="fa fa-trash"></i></button></span>'
                 : '<span class="btn-group"><button onClick="$(this).editUser(' +
-                  user._id +
+                  user.id +
                   ')" class="btn btn-warning"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteUser(' +
-                  user._id +
+                  user.id +
                   ')" class="btn btn-danger"><i class="fa fa-trash"></i></button></span>'
             }</td></tr>`;
         });
@@ -1590,8 +1618,8 @@ if (auth == undefined) {
         products.forEach((product, index) => {
           counter++;
 
-          let category = allCategories.filter(function (category) {
-            return category._id == product.category;
+          let category = allCategories.filter(function (cat) {
+            return parseInt(cat.id) === parseInt(product.category);
           });
 
           product.stockAlert = "";
@@ -1642,8 +1670,8 @@ if (auth == undefined) {
               </td>
               <td>${product.expirationDate}</td>
               <td>${category.length > 0 && category[0] ? category[0].name : ""}</td>
-              <td class="nobr"><span class="btn-group"><button onClick="$(this).editProduct(${product._id})" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteProduct(${
-                product._id
+              <td class="nobr"><span class="btn-group"><button onClick="$(this).editProduct(${product.id})" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteProduct(${
+                product.id
               })" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></button></span></td></tr>`;
 
           // Note: editProduct index might refer to allProducts index in old code?
@@ -1690,8 +1718,8 @@ if (auth == undefined) {
           counter++;
           category_list += `<tr>
             <td>${category.name}</td>
-            <td><span class="btn-group"><button onClick="$(this).editCategory(${category._id})" class="btn btn-warning"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteCategory(${
-              category._id
+            <td><span class="btn-group"><button onClick="$(this).editCategory(${category.id})" class="btn btn-warning"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteCategory(${
+              category.id
             })" class="btn btn-danger"><i class="fa fa-trash"></i></button></span></td></tr>`;
         });
 
@@ -1720,7 +1748,7 @@ if (auth == undefined) {
         diagOptions.okButtonText,
         diagOptions.cancelButtonText,
         () => {
-          $.get(api + "users/logout/" + user._id, function (data) {
+          $.get(api + "users/logout/" + user.id, function (data) {
             storage.delete("auth");
             storage.delete("user");
             ipcRenderer.send("app-reload", "");
@@ -1878,7 +1906,7 @@ if (auth == undefined) {
 
       $("#userModal").modal("show");
 
-      $("#user_id").val(user._id);
+      $("#user_id").val(user.id);
       $("#fullname").val(user.fullname);
       $("#username").val(user.username);
       $("#password").attr("placeholder", "New Password");
@@ -1989,6 +2017,10 @@ function loadTransactions() {
   let query = `by-date?start=${start_date}&end=${end_date}&user=${by_user}&status=${by_status}&till=${by_till}`;
 
   $.get(api + query, function (transactions) {
+    if (!settings) {
+      console.warn("Settings not loaded, cannot render transaction list.");
+      return;
+    }
     if (transactions && transactions.length > 0) {
       $("#transaction_list").empty();
       if ($.fn.DataTable.isDataTable("#transactionList")) {
@@ -2017,30 +2049,35 @@ function loadTransactions() {
 
         counter++;
         transaction_list += `<tr>
-                                <td>${trans.order}</td>
+                                <td>${trans.id}</td>
                                 <td class="nobr">${moment(trans.date).format(
                                   "DD-MMM-YYYY HH:mm:ss",
                                 )}</td>
                                 <td>${
-                                  validator.unescape(settings.symbol) +
+                                  validator.unescape(String(settings.symbol)) +
                                   moneyFormat(trans.total)
                                 }</td>
                                 <td>${
                                   trans.paid == ""
                                     ? ""
-                                    : validator.unescape(settings.symbol) +
-                                      moneyFormat(trans.paid)
+                                    : validator.unescape(
+                                        String(settings.symbol),
+                                      ) + moneyFormat(trans.paid)
                                 }</td>
                                 <td>${
                                   trans.change
-                                    ? validator.unescape(settings.symbol) +
+                                    ? validator.unescape(
+                                        String(settings.symbol),
+                                      ) +
                                       moneyFormat(
                                         Math.abs(trans.change).toFixed(2),
                                       )
                                     : ""
                                 }</td>
                                 <td>${
-                                  trans.paid == "" ? "" : trans.payment_type
+                                  trans.paid == ""
+                                    ? ""
+                                    : trans.payment_type || "Cash"
                                 }</td>
                                 <td>${
                                   trans.paid == ""
@@ -2053,7 +2090,7 @@ function loadTransactions() {
 
         if (counter == transactions.length) {
           $("#total_sales #counter").text(
-            validator.unescape(settings.symbol) +
+            validator.unescape(String(settings.symbol)) +
               moneyFormat(parseFloat(sales).toFixed(2)),
           );
           $("#total_transactions #counter").text(transact);
@@ -2112,7 +2149,7 @@ function loadTransactions() {
     } else {
       $("#transaction_list").empty();
       $("#total_sales #counter").text(
-        validator.unescape(settings.symbol) + "0.00",
+        validator.unescape(String(settings.symbol)) + "0.00",
       );
       $("#total_transactions #counter").text(0);
       $("#total_items #counter").text(0);
@@ -2150,7 +2187,7 @@ function loadSoldProducts() {
     products++;
 
     let product = allProducts.filter(function (selected) {
-      return selected._id == item.id;
+      return selected.id == item.id;
     });
 
     counter++;
@@ -2184,7 +2221,7 @@ function userFilter(users) {
 
   users.forEach((user) => {
     let u = allUsers.filter(function (usr) {
-      return usr._id == user;
+      return usr.id == user;
     });
 
     $("#users").append(`<option value="${user}">${u[0].fullname}</option>`);
@@ -2210,8 +2247,8 @@ $.fn.viewTransaction = function (index) {
   let refNumber =
     allTransactions[index].ref_number != ""
       ? allTransactions[index].ref_number
-      : allTransactions[index].order;
-  let orderNumber = allTransactions[index].order;
+      : allTransactions[index].id;
+  let orderNumber = allTransactions[index].id;
   let paymentMethod = "";
   let tax_row = "";
   let items = "";
@@ -2225,7 +2262,7 @@ $.fn.viewTransaction = function (index) {
     )} </td></tr>`;
   });
 
-  paymentMethod = allTransactions[index].payment_type;
+  paymentMethod = allTransactions[index].payment_type || "Cash";
 
   if (allTransactions[index].paid != "") {
     payment = `<tr>
