@@ -2,41 +2,54 @@ const { app, dialog} = require("electron");
 let mainWindow;
 const path = require("path");
 const iconPath = path.join(__dirname, "../../../assets/images/favicon.png");
-const appVersion = app.getVersion();
-const appName = app.getName();
 const pkg = require("../../../package.json");
 const { appConfig } = require("../../../app.config");
 const { autoUpdater } = require("electron-updater");
 const unzipper = require('unzipper');
 const archiver = require('archiver');
-const dbFolderPath = path.join(
-  process.env.APPDATA,
-  process.env.APPNAME,
-  "server",
-  "databases"
-);
-const uploadsFolderPath = path.join(
-  process.env.APPDATA,
-  process.env.APPNAME,
-  "uploads"
-);
 const fs = require('fs');
-const crypto = require('crypto'); 
-const isPackaged = app.isPackaged;
-const updateServer = appConfig.UPDATE_SERVER;
-const updateUrl = `${updateServer}/update/${
-  process.platform
-}/${app.getVersion()}`;
+const crypto = require('crypto');
 const { restartServer } = require('../../../server');
+
+// Helper functions to get app info (called after app is ready)
+function getAppVersion() {
+  return app.isPackaged ? app.getVersion() : 'dev';
+}
+
+function getAppName() {
+  return app.getName() || 'PharmaSpot';
+}
+
+function getDbFolderPath() {
+  return path.join(
+    process.env.APPDATA || app.getPath('userData'),
+    process.env.APPNAME || getAppName(),
+    "server",
+    "databases"
+  );
+}
+
+function getUploadsFolderPath() {
+  return path.join(
+    process.env.APPDATA || app.getPath('userData'),
+    process.env.APPNAME || getAppName(),
+    "uploads"
+  );
+}
+
+function getUpdateUrl() {
+  const updateServer = appConfig.UPDATE_SERVER;
+  return `${updateServer}/update/${app.platform}/${getAppVersion()}`;
+}
 
 function showAbout() {
   const options = {
-    applicationName: `${appName}`,
-    applicationVersion: `v${appVersion}`,
+    applicationName: getAppName(),
+    applicationVersion: `v${getAppVersion()}`,
     copyright: `Copyright © ${
       appConfig.COPYRIGHT_YEAR
     }-${new Date().getFullYear()} ${pkg.author}`,
-    version: `v${appVersion}`,
+    version: `v${getAppVersion()}`,
     authors: [pkg.author],
     website: pkg.website,
     iconPath: iconPath,
@@ -50,7 +63,7 @@ function getDocs() {}
 function sendFeedback() {}
 
 function checkForUpdates() {
-  if (!isPackaged) {
+  if (!app.isPackaged) {
     console.log(`Skipping update check in development mode`);
     return;
   }
@@ -63,7 +76,7 @@ function checkForUpdates() {
 
   autoUpdater.setFeedURL({
     provider: "generic",
-    url: updateUrl,
+    url: getUpdateUrl(),
   });
 
   autoUpdater.checkForUpdates();
@@ -326,21 +339,21 @@ const restoreBackupDialog = async (dbFolderPath, uploadsFolderPath) => {
 
 const initializeMainWindow = (win)=>{
 mainWindow = win;
-} 
+}
 
 const handleClick = (elementId)=>{
   mainWindow.webContents.send('click-element', elementId);
 }
 
 module.exports = {
-  showAbout, 
-  checkForUpdates, 
-  getDocs, 
+  showAbout,
+  checkForUpdates,
+  getDocs,
   sendFeedback,
   initializeMainWindow,
   handleClick,
-  dbFolderPath,
-  uploadsFolderPath,
+  getDbFolderPath,
+  getUploadsFolderPath,
   saveBackupDialog,
   restoreBackupDialog
  };

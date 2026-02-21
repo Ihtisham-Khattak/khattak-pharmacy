@@ -7,3 +7,38 @@ out/
 LICENSE
 coverage
 *.old*
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Database files (development)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Backups
+backups/
+*.bak
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+release-builds/
+dist/
+installers/

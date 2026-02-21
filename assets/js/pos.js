@@ -8,13 +8,30 @@ const _ = require("lodash");
 let fs = require("fs");
 let path = require("path");
 let moment = require("moment");
-let { ipcRenderer } = require("electron");
-let dotInterval = setInterval(function () {
-  $(".dot").text(".");
-}, 3000);
+// Use secure electron API from preload script
+const electronAPI = window.api || {};
+// Dot animation interval for loading states (cleaned up on page unload)
+let dotInterval = null;
+function startDotAnimation() {
+  if (dotInterval) clearInterval(dotInterval);
+  dotInterval = setInterval(function () {
+    const dots = $(".dot");
+    if (dots.length > 0) {
+      let current = dots.text();
+      dots.text(current.length >= 3 ? "." : current + ".");
+    }
+  }, 500);
+}
+function stopDotAnimation() {
+  if (dotInterval) {
+    clearInterval(dotInterval);
+    dotInterval = null;
+  }
+}
+// Clean up on page unload
+window.addEventListener("beforeunload", stopDotAnimation);
 let Store = require("electron-store");
-const remote = require("@electron/remote");
-const app = remote.app;
+// Remote module deprecated - using direct API calls where needed
 let cart = [];
 let index = 0;
 let allUsers = [];
@@ -39,8 +56,8 @@ let order_index = 0;
 let user_index = 0;
 let product_index = 0;
 let transaction_index;
-const appName = process.env.APPNAME;
-const appData = process.env.APPDATA;
+const appName = process.env.APPNAME || "PharmaSpot";
+const appData = process.env.APPDATA || "";
 let host = "localhost";
 let port = process.env.PORT;
 let img_path = path.join(appData, appName, "uploads", "/");
@@ -55,7 +72,6 @@ let orderTotal = 0;
 let auth_error = "Incorrect username or password";
 let auth_empty = "Please enter a username and password";
 let holdOrderlocation = $("#renderHoldOrders");
-let customerOrderLocation = $("#renderCustomerOrders");
 let storage = new Store();
 let settings;
 let platform;
@@ -960,7 +976,6 @@ if (auth == undefined) {
             $("#dueModal").modal("hide");
             $("#paymentModel").modal("hide");
             $.fn.getHoldOrders();
-            $.fn.getCustomerOrders();
             $.fn.renderTable(cart);
           },
 
@@ -1010,8 +1025,7 @@ if (auth == undefined) {
         $.fn.calculatePrice(order);
         renderLocation.append(
           $("<div>", {
-            class:
-              orderType == 1 ? "col-md-3 order" : "col-md-3 customer-order",
+            class: "col-md-3 order",
           }).append(
             $("<a>").append(
               $("<div>", { class: "card-box order-box" }).append(
@@ -1040,14 +1054,12 @@ if (auth == undefined) {
                 ),
                 $("<button>", {
                   class: "btn btn-danger del",
-                  onclick:
-                    "$(this).deleteOrder(" + index + "," + orderType + ")",
+                  onclick: "$(this).deleteOrder(" + index + ", 1)",
                 }).append($("<i>", { class: "fa fa-trash" })),
 
                 $("<button>", {
                   class: "btn btn-default",
-                  onclick:
-                    "$(this).orderDetails(" + index + "," + orderType + ")",
+                  onclick: "$(this).orderDetails(" + index + ", 1)",
                 }).append($("<span>", { class: "fa fa-shopping-basket" })),
               ),
             ),
@@ -1071,67 +1083,27 @@ if (auth == undefined) {
     $.fn.orderDetails = function (index, orderType) {
       $("#refNumber").val("");
 
-      if (orderType == 1) {
-        $("#refNumber").val(holdOrderList[index].ref_number);
+      $("#refNumber").val(holdOrderList[index].ref_number);
 
-        // CUSTOMER DROPDOWN - COMMENTED OUT
-        // $("#customer option:selected").removeAttr("selected");
+      holdOrder = holdOrderList[index].id;
+      cart = [];
+      $.each(holdOrderList[index].items, function (index, product) {
+        item = {
+          id: product.id,
+          product_name: product.product_name,
+          sku: product.sku,
+          price: product.price,
+          quantity: product.quantity,
+        };
+        cart.push(item);
+      });
 
-        // $("#customer option")
-        //   .filter(function () {
-        //     return $(this).text() == "Walk in customer";
-        //   })
-        //   .prop("selected", true);
-
-        holdOrder = holdOrderList[index].id;
-        cart = [];
-        $.each(holdOrderList[index].items, function (index, product) {
-          item = {
-            id: product.id,
-            product_name: product.product_name,
-            sku: product.sku,
-            price: product.price,
-            quantity: product.quantity,
-          };
-          cart.push(item);
-        });
-      } else if (orderType == 2) {
-        $("#refNumber").val("");
-
-        $("#customer option:selected").removeAttr("selected");
-
-        $("#customer option")
-          .filter(function () {
-            return $(this).text() == customerOrderList[index].customer.name;
-          })
-          .prop("selected", true);
-
-        holdOrder = customerOrderList[index].id;
-        cart = [];
-        $.each(customerOrderList[index].items, function (index, product) {
-          item = {
-            id: product.id,
-            product_name: product.product_name,
-            sku: product.sku,
-            price: product.price,
-            quantity: product.quantity,
-          };
-          cart.push(item);
-        });
-      }
       $(this).renderTable(cart);
       $("#holdOrdersModal").modal("hide");
-      $("#customerModal").modal("hide");
     };
 
     $.fn.deleteOrder = function (index, type) {
-      switch (type) {
-        case 1:
-          deleteId = holdOrderList[index].id;
-          break;
-        case 2:
-          deleteId = customerOrderList[index].id;
-      }
+      deleteId = holdOrderList[index].id;
 
       let data = {
         orderId: deleteId,
@@ -1161,7 +1133,6 @@ if (auth == undefined) {
             cache: false,
             success: function (data) {
               $(this).getHoldOrders();
-              $(this).getCustomerOrders();
 
               notiflix.Report.success(
                 "Deleted!",
@@ -1175,15 +1146,6 @@ if (auth == undefined) {
           });
         },
       );
-    };
-
-    $.fn.getCustomerOrders = function () {
-      $.get(api + "customer-orders", function (data) {
-        //clearInterval(dotInterval);
-        customerOrderList = data;
-        customerOrderLocation.empty();
-        $(this).renderHoldOrders(customerOrderList, customerOrderLocation, 2);
-      });
     };
 
     $("#saveCustomer").on("submit", function (e) {
@@ -1274,12 +1236,6 @@ if (auth == undefined) {
     $("#viewRefOrders").on("click", function () {
       setTimeout(function () {
         $("#holdOrderInput").focus();
-      }, 500);
-    });
-
-    $("#viewCustomerOrders").on("click", function () {
-      setTimeout(function () {
-        $("#holdCustomerOrderInput").focus();
       }, 500);
     });
 
@@ -1751,7 +1707,11 @@ if (auth == undefined) {
           $.get(api + "users/logout/" + user.id, function (data) {
             storage.delete("auth");
             storage.delete("user");
-            ipcRenderer.send("app-reload", "");
+            if (electronAPI.reloadApp) {
+              electronAPI.reloadApp();
+            } else {
+              window.location.reload();
+            }
           });
         },
       );
@@ -1804,7 +1764,11 @@ if (auth == undefined) {
         $(this).ajaxSubmit({
           contentType: "application/json",
           success: function () {
-            ipcRenderer.send("app-reload", "");
+            if (electronAPI.reloadApp) {
+              electronAPI.reloadApp();
+            } else {
+              window.location.reload();
+            }
           },
           error: function (jqXHR) {
             console.error(jqXHR.responseJSON.message);
@@ -1832,7 +1796,11 @@ if (auth == undefined) {
         if (isNumeric(formData.till)) {
           formData["app"] = $("#app").find("option:selected").text();
           storage.set("settings", formData);
-          ipcRenderer.send("app-reload", "");
+          if (electronAPI.reloadApp) {
+            electronAPI.reloadApp();
+          } else {
+            window.location.reload();
+          }
         } else {
           notiflix.Report.warning(
             "Oops!",
@@ -1864,7 +1832,11 @@ if (auth == undefined) {
           processData: false,
           success: function (data) {
             if (ownUserEdit) {
-              ipcRenderer.send("app-reload", "");
+              if (electronAPI.reloadApp) {
+                electronAPI.reloadApp();
+              } else {
+                window.location.reload();
+              }
             } else {
               $("#userModal").modal("hide");
 
@@ -2461,10 +2433,17 @@ $("body").on("submit", "#account", function (e) {
         if (data.auth === true) {
           storage.set("auth", { auth: true });
           storage.set("user", data);
-          ipcRenderer.send("app-reload", "");
+          if (electronAPI.reloadApp) {
+            electronAPI.reloadApp();
+          } else {
+            window.location.reload();
+          }
           $("#login").hide();
+        } else if (data.mustChangePassword) {
+          $("#changePasswordUserId").val(data.id);
+          $("#changePasswordModal").modal("show");
         } else {
-          notiflix.Report.warning("Oops!", auth_error, "Ok");
+          notiflix.Report.warning("Oops!", data.message || auth_error, "Ok");
         }
       },
       error: function (data) {
@@ -2472,6 +2451,53 @@ $("body").on("submit", "#account", function (e) {
       },
     });
   }
+});
+
+$("body").on("submit", "#forceChangePassword", function (e) {
+  e.preventDefault();
+  let formData = $(this).serializeObject();
+  let confirmPass = $("#confirmPassword").val();
+
+  if (formData.newPassword !== confirmPass) {
+    notiflix.Report.warning("Error", "Passwords do not match!", "Ok");
+    return;
+  }
+
+  if (formData.newPassword.length < 8) {
+    notiflix.Report.warning(
+      "Error",
+      "Password must be at least 8 characters long!",
+      "Ok",
+    );
+    return;
+  }
+
+  $.ajax({
+    url: api + "users/change-password",
+    type: "POST",
+    data: JSON.stringify(formData),
+    contentType: "application/json; charset=utf-8",
+    cache: false,
+    processData: false,
+    success: function (data) {
+      notiflix.Report.success(
+        "Success",
+        "Password changed! Please login with your new password.",
+        "Ok",
+        () => {
+          $("#changePasswordModal").modal("hide");
+          $("#forceChangePassword")[0].reset();
+        },
+      );
+    },
+    error: function (jqXHR) {
+      notiflix.Report.failure(
+        "Error",
+        jqXHR.responseJSON.message || "Failed to change password",
+        "Ok",
+      );
+    },
+  });
 });
 
 $("#quit").on("click", function () {
@@ -2489,11 +2515,12 @@ $("#quit").on("click", function () {
     diagOptions.okButtonText,
     diagOptions.cancelButtonText,
     () => {
-      ipcRenderer.send("app-quit", "");
+      if (electronAPI.quitApp) {
+        electronAPI.quitApp();
+      }
     },
   );
 });
 
-ipcRenderer.on("click-element", (event, elementId) => {
-  document.getElementById(elementId).click();
-});
+// Listen for click events from main process (native menu)
+// This is now handled in renderer.js via electronAPI

@@ -45,26 +45,6 @@ app.get("/on-hold", function (req, res) {
 });
 
 /**
- * GET endpoint: Get customer orders.
- */
-app.get("/customer-orders", function (req, res) {
-  try {
-    const transactions = db
-      .prepare(
-        "SELECT * FROM transactions WHERE customer_id != 0 AND status = 0 AND ref_number = ''",
-      )
-      .all();
-    const formatted = transactions.map((t) => ({
-      ...t,
-      items: JSON.parse(t.items),
-    }));
-    res.send(formatted);
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-});
-
-/**
  * GET endpoint: Get transactions by date range and filters.
  */
 app.get("/by-date", function (req, res) {

@@ -6,6 +6,9 @@
 
 PharmaSpot is a cross-platform Point of Sale system designed for pharmacies and built to streamline operations and enhance customer service.
 
+> **🔒 Version 1.6.0 - Security Update**
+> This version includes critical security improvements. Please read [UPGRADE.md](./UPGRADE.md) before updating from previous versions.
+
 ## Features
 
 ✔️ **Multi-PC Support:** Allows multiple computers on a network to access a central database, ensuring data consistency across all locations.
@@ -44,6 +47,32 @@ PharmaSpot is a cross-platform Point of Sale system designed for pharmacies and 
 
 ✔️ **Improved UI** Enjoy a fresh, modern look with enhanced display quality, making the user experience more appealing.
 
+---
+
+## 🔐 Security Features (New in v1.6.0)
+
+### Authentication & Authorization
+- ✅ **Strong Password Policy** - Minimum 8 characters with complexity requirements
+- ✅ **Account Lockout** - Protects against brute force attacks (5 attempts max)
+- ✅ **Session Management** - Secure session tokens with automatic expiration
+- ✅ **Permission-Based Access** - Granular control over user permissions
+- ✅ **Forced Password Change** - Default passwords must be changed on first login
+
+### Data Protection
+- ✅ **Audit Logging** - All sensitive actions are logged for compliance
+- ✅ **Database Integrity** - Foreign key constraints and data validation
+- ✅ **Secure Backups** - Backup/restore with SHA256 integrity verification
+- ✅ **Input Validation** - All user inputs validated and sanitized
+
+### Application Security
+- ✅ **Secure Electron** - Context isolation, disabled Node.js in renderer
+- ✅ **Rate Limiting** - Prevents abuse and DoS attacks
+- ✅ **API Protection** - All endpoints require authentication
+- ✅ **Content Security Policy** - Prevents XSS and injection attacks
+
+📖 **See [SECURITY.md](./SECURITY.md) for complete security documentation**
+
+---
 
 ## Demo
 
@@ -59,27 +88,97 @@ PharmaSpot is a cross-platform Point of Sale system designed for pharmacies and 
 
 
 ## Getting Started
-- Download [PharmaSpot](https://github.com/drkNsubuga/PharmaSpot/releases/latest)
-- Unzip the package to a location of your choice.
-- Click the ``PharmaSpot`` executable in the folder
-- Login for default user:
 
-	- ``username:`` admin
-	- ``password:`` admin
+### Installation
+
+1. **Download** [PharmaSpot](https://github.com/drkNsubuga/PharmaSpot/releases/latest)
+2. **Unzip** the package to a location of your choice
+3. **Click** the `PharmaSpot` executable in the folder
+
+### First-Time Setup
+
+> ⚠️ **IMPORTANT - Security Update v1.6.0**
+> 
+> The default admin password is now randomly generated on first run for security.
+
+**For Development:**
+- Check the console output for the temporary admin password
+- You will be forced to change it on first login
+
+**For Production:**
+- See [UPGRADE.md](./UPGRADE.md) for deployment instructions
+- Configure `.env` file from `.env.example` template
+
+### Default Login (Development Only)
+
+- **Username:** `admin`
+- **Password:** (shown in console on first run - **must be changed**)
+
+---
 
 ## For Developers
-- Clone this project.
-- Open terminal and navigate into the cloned folder.
-- Run ```npm install``` to install dependencies.
-- Run ```npm run start```.
-- Run ```gulp``` to bundle css and js assets
-- Run ```npm run test``` to run tests
-  
+
+### Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/drkNsubuga/PharmaSpot.git
+cd PharmaSpot
+
+# Install dependencies
+npm install
+
+# Copy environment template
+cp .env.example .env
+# Edit .env with your settings
+
+# Start the application
+npm run start
+
+# Build CSS and JS assets
+gulp
+
+# Run tests
+npm test
+```
+
+### Development Requirements
+
+- Node.js 18+ 
+- npm or yarn
+- For building: electron-forge
+
+### Project Structure
+
+```
+PharmaSpot/
+├── src/
+│   ├── main/           # Electron main process
+│   ├── server/         # Express backend
+│   │   ├── middleware/ # Auth, rate limiting, error handling
+│   │   ├── validators/ # Input validation
+│   │   └── db/         # Database layer
+│   └── config/         # Configuration
+├── api/                # API routes
+├── assets/             # Frontend assets
+├── data/               # Database storage
+├── logs/               # Application logs
+└── backups/            # Backup storage
+```
+
+### Documentation
+
+- [Security Documentation](./SECURITY.md)
+- [Upgrade Guide](./UPGRADE.md)
+- [Implementation Summary](./IMPLEMENTATION_SUMMARY.md)
+
+---
+
 ## Credits
 
 Adapted from [tngoman](https://github.com/tngoman/Store-POS).
 
-Feel free to report any issues or suggest enhancements via [GitHub Issues](https://github.com/drkNsubuga/PharmaSpot/issues). 
+Feel free to report any issues or suggest enhancements via [GitHub Issues](https://github.com/drkNsubuga/PharmaSpot/issues).
 
 ## Contributing
 

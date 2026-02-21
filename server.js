@@ -1,35 +1,48 @@
+/**
+ * Express Server Configuration
+ * Secure API server with authentication and rate limiting
+ */
+
 const http = require("http");
 const express = require("express")();
 const server = http.createServer(express);
 const bodyParser = require("body-parser");
-const rateLimit = require("express-rate-limit");
-const pkg = require("./package.json");
 const { app } = require("electron");
-const { initDB } = require("./api/db");
+const path = require("path");
+const fs = require("fs");
+
+// Import middleware
+const { requireAuth } = require("./src/server/middleware/auth");
+const { apiLimiter } = require("./src/server/middleware/rateLimiter");
+const { notFoundHandler, errorHandler } = require("./src/server/middleware/errorHandler");
+
+// Import database
+const { initDB, dbPath } = require("./src/server/db/db");
 
 // Initialize SQLite Database
 initDB();
 
+// Set up app data paths
 process.env.APPDATA = app.getPath("appData");
-process.env.APPNAME = pkg.name;
+process.env.APPNAME = app.getName() || "PharmaSpot";
 const PORT = process.env.PORT || 0;
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per window
-});
 
 console.log("Server started");
 
-express.use(bodyParser.json());
-express.use(bodyParser.urlencoded({ extended: false }));
-express.use(limiter);
+// Configure Express
+express.use(bodyParser.json({ limit: '10mb' }));
+express.use(bodyParser.urlencoded({ extended: false, limit: '10mb' }));
 
-express.all("/*", function (req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
+// Apply rate limiting to all API routes
+express.use('/api', apiLimiter);
+
+// CORS configuration (restricted for security)
+express.all("/api/*", function (req, res, next) {
+  res.header("Access-Control-Allow-Origin", "file://*");
   res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
   res.header(
     "Access-Control-Allow-Headers",
-    "Content-type,Accept,X-Access-Token,X-Key",
+    "Content-type,Accept,X-Access-Token,X-Key,X-User-Id,X-Session-Token",
   );
   if (req.method == "OPTIONS") {
     res.status(200).end();
@@ -38,16 +51,39 @@ express.all("/*", function (req, res, next) {
   }
 });
 
-express.get("/", function (req, res) {
-  res.send("POS Server Online.");
+// Security headers
+express.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
 });
 
+// Health check endpoint
+express.get("/", function (req, res) {
+  res.json({ 
+    status: "online",
+    service: "PharmaSpot API",
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Apply authentication middleware to all API routes
+express.use('/api', requireAuth);
+
+// API Routes
 express.use("/api/inventory", require("./api/inventory"));
 express.use("/api/customers", require("./api/customers"));
 express.use("/api/categories", require("./api/categories"));
 express.use("/api/settings", require("./api/settings"));
 express.use("/api/users", require("./api/users"));
 express.use("/api", require("./api/transactions"));
+
+// 404 handler for API routes
+express.use('/api', notFoundHandler);
+
+// Global error handler (must be last)
+express.use(errorHandler);
 
 server.listen(PORT, () => {
   process.env.PORT = server.address().port;
@@ -61,7 +97,7 @@ function restartServer() {
   server.close(() => {
     // Remove cached modules so require() reloads them
     Object.keys(require.cache).forEach((key) => {
-      if (key.includes("api") || key.endsWith("server.js")) {
+      if (key.includes("api") || key.endsWith("server.js") || key.includes("src/server")) {
         delete require.cache[key];
       }
     });
@@ -70,4 +106,4 @@ function restartServer() {
   });
 }
 
-module.exports = { restartServer };
+module.exports = { restartServer, server };

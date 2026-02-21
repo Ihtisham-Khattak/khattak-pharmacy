@@ -33,12 +33,14 @@ const daysToExpire = (dueDate) => {
  * @param {number} minimumStock - The minimum required quantity of stock.
  * @returns {number} - Returns 0 if there is no stock, -1 if the stock is low, and 1 if the stock level is normal.
  */
-const getStockStatus = (currentStock, minimumStock)=>{
+const getStockStatus = (currentStock, minimumStock) => {
   currentStock = Number(currentStock);
   minimumStock = Number(minimumStock);
 
-   if (isNaN(currentStock) || isNaN(minimumStock)) {
-    throw new Error("Invalid input: both currentStock and minimumStock should be numbers.");
+  if (isNaN(currentStock) || isNaN(minimumStock)) {
+    throw new Error(
+      "Invalid input: both currentStock and minimumStock should be numbers.",
+    );
   }
 
   if (currentStock <= 0) {
@@ -49,14 +51,13 @@ const getStockStatus = (currentStock, minimumStock)=>{
     return -1; // Low stock
   }
   return 1; // Normal stock
-}
-
+};
 
 /** File **/
 const checkFileExists = (filePath) => {
   try {
     const stats = fs.statSync(filePath);
-    return stats.isFile(); 
+    return stats.isFile();
   } catch (err) {
     return false;
   }
@@ -67,35 +68,51 @@ const checkFileType = (fileType, validFileTypes) => {
 };
 
 const getFileHash = (filePath) => {
-  const fileData = fs.readFileSync(filePath);
-  const hash = crypto.createHash("sha256").update(fileData).digest("hex");
-  return hash;
+  try {
+    const fileData = fs.readFileSync(filePath);
+    return crypto.createHash("sha256").update(fileData).digest("hex");
+  } catch (err) {
+    console.warn(`Failed to get hash for ${filePath}: ${err.message}`);
+    return "fallback-hash-" + Math.random().toString(36).substring(7);
+  }
 };
 
-
 const filterFile = (req, file, callback) => {
-    try {
-      const isValidFile = checkFileType(file.mimetype, validFileTypes);
-      if (isValidFile) {
-        return callback(null, true);
-      } else {
-        return callback(new Error(`Invalid file type. Only JPEG, PNG, GIF, and WEBP files are allowed.`), false);
-      }
-    } catch (err) {
-      return callback(new Error(`An error occurred: ${err}`),false);
+  try {
+    const isValidFile = checkFileType(file.mimetype, validFileTypes);
+    if (isValidFile) {
+      return callback(null, true);
+    } else {
+      return callback(
+        new Error(
+          `Invalid file type. Only JPEG, PNG, GIF, and WEBP files are allowed.`,
+        ),
+        false,
+      );
     }
+  } catch (err) {
+    return callback(new Error(`An error occurred: ${err}`), false);
   }
+};
 
 /*Security*/
 
 const setContentSecurityPolicy = () => {
-  let scriptHash = getFileHash(path.join(__dirname,"../dist","js","bundle.min.js"))
-  let styleHash = getFileHash(path.join(__dirname,"../dist","css","bundle.min.css"));
-  let content = `default-src 'self'; img-src 'self' data:;script-src 'self' 'unsafe-eval' 'unsafe-inline' sha256-${scriptHash}; style-src 'self' 'unsafe-inline' sha256-${styleHash};font-src 'self';base-uri 'self'; form-action 'self'; ;connect-src 'self' http://localhost:${PORT};`;
-  let metaTag = document.createElement("meta");
-  metaTag.setAttribute("http-equiv", "Content-Security-Policy");
-  metaTag.setAttribute("content", content);
-  document.head.appendChild(metaTag);
+  try {
+    let scriptHash = getFileHash(
+      path.join(__dirname, "../dist", "js", "bundle.min.js"),
+    );
+    let styleHash = getFileHash(
+      path.join(__dirname, "../dist", "css", "bundle.min.css"),
+    );
+    let content = `default-src 'self'; img-src 'self' data:;script-src 'self' 'unsafe-eval' 'unsafe-inline' sha256-${scriptHash}; style-src 'self' 'unsafe-inline' sha256-${styleHash};font-src 'self';base-uri 'self'; form-action 'self'; ;connect-src 'self' http://localhost:${PORT};`;
+    let metaTag = document.createElement("meta");
+    metaTag.setAttribute("http-equiv", "Content-Security-Policy");
+    metaTag.setAttribute("content", content);
+    document.head.appendChild(metaTag);
+  } catch (err) {
+    console.error("Failed to set Content Security Policy:", err);
+  }
 };
 
 module.exports = {
@@ -107,5 +124,5 @@ module.exports = {
   daysToExpire,
   checkFileExists,
   checkFileType,
-  setContentSecurityPolicy
+  setContentSecurityPolicy,
 };

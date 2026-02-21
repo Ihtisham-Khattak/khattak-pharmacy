@@ -34,7 +34,7 @@
             <div class="form-group">
               <input
                 type="text"
-                placeholder="Username"
+                placeholder="Username or Email"
                 name="username"
                 class="form-control"
               />
@@ -149,16 +149,6 @@
                 data-toggle="modal"
                 data-target="#holdOrdersModal"
                 ><i class="fa fa-shopping-basket"></i> Open Tabs</a
-              >
-            </li>
-            <li>
-              <a
-                href="#"
-                id="viewCustomerOrders"
-                data-toggle="modal"
-                data-target="#customerModal"
-                onclick="$(this).getCustomerOrders()"
-                ><i class="fa fa-shopping-cart"></i> Orders</a
               >
             </li>
           </ul>
@@ -1476,44 +1466,61 @@
         </div>
       </div>
       <div
-        id="customerModal"
-        class="modal fade bs-example-modal-lg"
+        id="changePasswordModal"
+        class="modal fade bs-example-modal-sm"
         tabindex="-1"
         role="dialog"
-        aria-labelledby="myLargeModalLabel"
+        aria-labelledby="changePasswordLabel"
         aria-hidden="true"
+        data-backdrop="static"
+        data-keyboard="false"
       >
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-sm">
           <div class="modal-content">
             <div class="modal-header">
-              <button
-                type="button"
-                class="close"
-                data-dismiss="modal"
-                aria-hidden="true"
-              >
-                ×
-              </button>
-              <h4 class="modal-title" id="myLargeModalLabel">
-                Customer Orders
+              <h4 class="modal-title" id="changePasswordLabel">
+                Change Password
               </h4>
+              <p class="text-muted">
+                You must change your default password to continue.
+              </p>
             </div>
             <div class="modal-body">
-              <input
-                type="text"
-                id="holdCustomerOrderInput"
-                placeholder="Search order by customer name"
-                class="holdCustomerOrderInput form-control"
-              />
-              <div class="customerOrderKeyboard"></div>
-              <br />
-              <div class="row" id="renderCustomerOrders">
-                <p>please wait <span class="dot"></span></p>
-              </div>
+              <form id="forceChangePassword">
+                <input type="hidden" id="changePasswordUserId" name="userId" />
+                <div class="form-group">
+                  <label for="newPassword">New Password</label>
+                  <input
+                    type="password"
+                    name="newPassword"
+                    id="newPassword"
+                    class="form-control"
+                    placeholder="Enter new password"
+                    required
+                  />
+                  <small class="form-text text-muted"
+                    >Min 8 chars, incl. uppercase, number & symbol.</small
+                  >
+                </div>
+                <div class="form-group">
+                  <label for="confirmPassword">Confirm Password</label>
+                  <input
+                    type="password"
+                    id="confirmPassword"
+                    class="form-control"
+                    placeholder="Confirm new password"
+                    required
+                  />
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                  Change & Login
+                </button>
+              </form>
             </div>
           </div>
         </div>
       </div>
+
       <div
         id="orderModal"
         class="modal fade bs-example-modal-sm"
