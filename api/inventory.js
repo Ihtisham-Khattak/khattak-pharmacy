@@ -97,7 +97,7 @@ app.post("/product", function (req, res) {
       const newId = Math.floor(Date.now() / 1000);
       db.prepare(
         `
-        INSERT INTO inventory (id, name, generic, category, price, quantity, minStock, expirationDate, stock, strength, form)
+        INSERT INTO inventory (id, name, generic, category_id, price, quantity, minStock, expirationDate, stock, strength, form)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       ).run(
@@ -118,7 +118,7 @@ app.post("/product", function (req, res) {
       db.prepare(
         `
         UPDATE inventory SET 
-          name = ?, generic = ?, category = ?, 
+          name = ?, generic = ?, category_id = ?, 
           price = ?, quantity = ?, minStock = ?, 
           expirationDate = ?, stock = ?, strength = ?, form = ?
         WHERE id = ?
@@ -139,7 +139,9 @@ app.post("/product", function (req, res) {
       res.sendStatus(200);
     }
   } catch (err) {
-    res.status(500).send(err.message);
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", message: err.message });
   }
 });
 

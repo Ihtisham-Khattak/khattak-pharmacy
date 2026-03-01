@@ -142,7 +142,7 @@ $(function () {
 
   cb(start, end);
 
-  function renderPagination(total, limit, page, type, container) {
+  window.renderPagination = function (total, limit, page, type, container) {
     let pages = Math.ceil(total / limit);
     let html =
       '<div class="row"><div class="col-md-12"><div class="text-center"><ul class="pagination pagination-sm">';
@@ -163,7 +163,7 @@ $(function () {
     $(container)
       .parent()
       .append(`<div class="pagination-container">${html}</div>`);
-  }
+  };
 
   $("#expirationDate").daterangepicker({
     singleDatePicker: true,

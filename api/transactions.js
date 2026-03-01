@@ -102,8 +102,8 @@ app.post("/new", function (req, res) {
     const t = req.body;
     db.prepare(
       `
-      INSERT INTO transactions (id, date, user_id, till, status, total, paid, change, customer_id, ref_number, items, payment_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO transactions (id, date, user_id, till, status, total, paid, change, customer_id, ref_number, items, payment_type, discount, tax)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     ).run(
       t._id ? t._id.toString() : "",
@@ -118,6 +118,8 @@ app.post("/new", function (req, res) {
       t.ref_number || "",
       JSON.stringify(t.items),
       t.payment_type || "Cash",
+      t.discount || 0,
+      t.tax || 0,
     );
 
     if (t.paid >= t.total) {
@@ -143,7 +145,7 @@ app.put("/new", function (req, res) {
         date = ?, user_id = ?, till = ?, status = ?, 
         total = ?, paid = ?, change = ?, 
         customer_id = ?, ref_number = ?, items = ?,
-        payment_type = ?
+        payment_type = ?, discount = ?, tax = ?
       WHERE id = ?
     `,
     ).run(
@@ -158,6 +160,8 @@ app.put("/new", function (req, res) {
       t.ref_number || "",
       JSON.stringify(t.items),
       t.payment_type || "Cash",
+      t.discount || 0,
+      t.tax || 0,
       t._id ? t._id.toString() : "",
     );
     res.sendStatus(200);
