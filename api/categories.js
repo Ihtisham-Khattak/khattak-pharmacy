@@ -1,8 +1,11 @@
 const app = require("express")();
 const bodyParser = require("body-parser");
-const { db } = require("./db");
+const { db, ensureForeignKeysEnabled } = require("./db");
 
 app.use(bodyParser.json());
+
+// Ensure FK is enabled for this API
+ensureForeignKeysEnabled();
 
 module.exports = app;
 

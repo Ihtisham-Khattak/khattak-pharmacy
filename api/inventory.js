@@ -2,9 +2,12 @@ const app = require("express")();
 const bodyParser = require("body-parser");
 const async = require("async");
 const validator = require("validator");
-const { db } = require("./db");
+const { db, ensureForeignKeysEnabled } = require("./db");
 
 app.use(bodyParser.json());
+
+// Ensure FK is enabled for this API
+ensureForeignKeysEnabled();
 
 module.exports = app;
 
@@ -78,9 +81,11 @@ app.post("/product", function (req, res) {
       ? validator.escape(req.body.expirationDate.toString())
       : "";
     let price = req.body.price ? parseFloat(req.body.price) : 0;
-    let category = req.body.category
+    let categoryStr = req.body.category
       ? validator.escape(req.body.category.toString())
       : "";
+    let category =
+      !categoryStr || categoryStr === "0" ? null : parseInt(categoryStr);
     let quantity = req.body.quantity ? parseInt(req.body.quantity) : 0;
     let name = req.body.name ? validator.escape(req.body.name.toString()) : "";
     let minStock = req.body.minStock ? parseInt(req.body.minStock) : 0;

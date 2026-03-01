@@ -690,6 +690,17 @@ if (auth == undefined) {
 
     $.fn.submitDueOrder = function (status) {
       try {
+        // Fix #5: Check if cart is empty at the start
+        if (!cart || cart.length === 0) {
+          notiflix.Report.warning(
+            "Empty Cart",
+            "There are no items in the cart to process.",
+            "Ok",
+          );
+          return;
+        }
+
+        // Fix #3: Enhanced null checks for settings and platform
         if (!settings || !platform) {
           console.error("Settings or Platform data missing");
           notiflix.Report.failure(
@@ -700,15 +711,43 @@ if (auth == undefined) {
           return;
         }
 
+        // Fix #4: Move reference validation before any processing (for hold orders)
+        if (status == 0) {
+          let refNumber = $("#refNumber").val() || "";
+          if (refNumber.trim() === "") {
+            notiflix.Report.warning(
+              "Reference Required!",
+              "You need to enter a reference for hold orders!",
+              "Ok",
+            );
+            return;
+          }
+        }
+
+        // Fix #6: Properly initialize payment type with better fallback
+        let $activePayment = $(".list-group-item.active");
+        let p_type =
+          $activePayment.length > 0
+            ? $activePayment.data("payment-type")
+            : 1;
+        if (!p_type || isNaN(p_type)) {
+          p_type = 1; // Default to Cash
+        }
+
         let items = "";
         let payment = 0;
-        let p_type = $(".list-group-item.active").data("payment-type") || 1; // Fallback to 1 (Cash)
 
+        // Fix #3: Add null checks for cart items
         cart.forEach((item) => {
-          items += `<tr><td>${DOMPurify.sanitize(item.product_name)}</td><td>${DOMPurify.sanitize(
-            item.quantity,
-          )} </td><td class="text-right"> ${DOMPurify.sanitize(validator.unescape(String(settings.symbol || "$")))} ${moneyFormat(
-            DOMPurify.sanitize(Math.abs(item.price).toFixed(2)),
+          let productName = item.product_name || "Unknown Item";
+          let quantity = item.quantity || 0;
+          let price = item.price || 0;
+          let symbol = settings.symbol || "$";
+
+          items += `<tr><td>${DOMPurify.sanitize(productName)}</td><td>${DOMPurify.sanitize(
+            quantity,
+          )} </td><td class="text-right"> ${DOMPurify.sanitize(validator.unescape(String(symbol)))} ${moneyFormat(
+            DOMPurify.sanitize(Math.abs(price).toFixed(2)),
           )} </td></tr>`;
         });
 
@@ -743,17 +782,18 @@ if (auth == undefined) {
         }
 
         if (paid != "") {
+          let symbol = settings.symbol || "$";
           payment = `<tr>
                           <td>Paid</td>
                           <td>:</td>
-                          <td class="text-right">${validator.unescape(String(settings.symbol || "$"))} ${moneyFormat(
+                          <td class="text-right">${validator.unescape(String(symbol))} ${moneyFormat(
                             Math.abs(paid).toFixed(2),
                           )}</td>
                       </tr>
                       <tr>
                           <td>Change</td>
                           <td>:</td>
-                          <td class="text-right">${validator.unescape(String(settings.symbol || "$"))} ${moneyFormat(
+                          <td class="text-right">${validator.unescape(String(symbol))} ${moneyFormat(
                             Math.abs(change).toFixed(2),
                           )}</td>
                       </tr>
@@ -765,27 +805,19 @@ if (auth == undefined) {
         }
 
         if (settings.charge_tax) {
+          let symbol = settings.symbol || "$";
           tax_row = `<tr>
                       <td>VAT(${validator.unescape(String(settings.percentage || "0"))})% </td>
                       <td>:</td>
-                      <td class="text-right">${validator.unescape(String(settings.symbol || "$"))} ${moneyFormat(
+                      <td class="text-right">${validator.unescape(String(symbol))} ${moneyFormat(
                         parseFloat(totalVat || 0).toFixed(2),
                       )}</td>
                   </tr>`;
         }
 
-        if (status == 0) {
-          if ($("#refNumber").val() == "") {
-            notiflix.Report.warning(
-              "Reference Required!",
-              "You need to enter a reference for hold orders!",
-              "Ok",
-            );
-            return;
-          }
-        }
-
+        // Fix #8: Show loading state with disabled button
         $(".loading").show();
+        $("#dueModal button").prop("disabled", true);
 
         if (holdOrder != 0) {
           orderNumber = holdOrder;
@@ -957,6 +989,12 @@ if (auth == undefined) {
             $("#orderModal").modal("show");
             loadProducts();
             $(".loading").hide();
+            // Fix #8: Re-enable buttons
+            $("#dueModal button").prop("disabled", false);
+            // Clear form fields on success
+            $("#refNumber").val("");
+            $("#change").text("");
+            $("#payment,#paymentText").val("");
             $("#dueModal").modal("hide");
             $("#paymentModel").modal("hide");
             $.fn.getHoldOrders();
@@ -964,23 +1002,58 @@ if (auth == undefined) {
             $.fn.renderTable(cart);
           },
 
-          error: function (data) {
+          // Fix #1 & #2: Improved error handling with actual error message
+          error: function (xhr, textStatus, errorThrown) {
             $(".loading").hide();
-            $("#dueModal").modal("toggle");
+            // Fix #2: Use hide instead of toggle to properly close modal
+            $("#dueModal").modal("hide");
+            // Fix #8: Re-enable buttons
+            $("#dueModal button").prop("disabled", false);
+
+            // Fix #1: Get actual error message from server response
+            let errorMessage = "An unexpected error occurred.";
+            let errorTitle = "Hold Order Failed";
+
+            try {
+              if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMessage = xhr.responseJSON.message;
+              } else if (xhr.responseText) {
+                // Try to parse response text as JSON
+                try {
+                  let response = JSON.parse(xhr.responseText);
+                  errorMessage = response.message || response.error || xhr.responseText;
+                } catch (e) {
+                  errorMessage = xhr.responseText.substring(0, 200);
+                }
+              } else if (errorThrown) {
+                errorMessage = errorThrown;
+              }
+            } catch (e) {
+              console.error("Error parsing server response:", e);
+            }
+
+            console.error("Hold order error:", {
+              status: xhr.status,
+              statusText: xhr.statusText,
+              response: xhr.responseText,
+              error: errorThrown,
+            });
+
             notiflix.Report.failure(
-              "Something went wrong!",
-              "Please refresh this page and try again",
+              errorTitle,
+              errorMessage,
               "Ok",
             );
           },
         });
 
-        $("#refNumber").val("");
-        $("#change").text("");
-        $("#payment,#paymentText").val("");
+        // Fix #8: Only clear form fields on success (moved to success callback)
+        // Fields are cleared in success handler to prevent data loss on error
       } catch (err) {
         console.error("Critical error in submitDueOrder:", err);
         $(".loading").hide();
+        // Fix #8: Re-enable buttons on error
+        $("#dueModal button").prop("disabled", false);
         notiflix.Report.failure(
           "Checkout Error",
           "An unexpected error occurred: " + err.message,
@@ -1008,6 +1081,24 @@ if (auth == undefined) {
     $.fn.renderHoldOrders = function (data, renderLocation, orderType) {
       $.each(data, function (index, order) {
         $.fn.calculatePrice(order);
+
+        // Fix #7: Handle customer object properly (may be JSON string, object, or null)
+        let customerName = "Walk in customer";
+        try {
+          if (order.customer) {
+            // If customer is a JSON string, parse it
+            if (typeof order.customer === "string") {
+              let parsed = JSON.parse(order.customer);
+              customerName = parsed.name || "Walk in customer";
+            } else if (typeof order.customer === "object" && order.customer.name) {
+              customerName = order.customer.name;
+            }
+          }
+        } catch (e) {
+          console.warn("Error parsing customer data:", e);
+          customerName = "Walk in customer";
+        }
+
         renderLocation.append(
           $("<div>", {
             class:
@@ -1017,24 +1108,21 @@ if (auth == undefined) {
               $("<div>", { class: "card-box order-box" }).append(
                 $("<p>").append(
                   $("<b>", { text: "Ref :" }),
-                  $("<span>", { text: order.ref_number, class: "ref_number" }),
+                  $("<span>", { text: order.ref_number || "N/A", class: "ref_number" }),
                   $("<br>"),
                   $("<b>", { text: "Price :" }),
                   $("<span>", {
-                    text: order.total,
+                    text: order.total || "0.00",
                     class: "label label-info",
                     style: "font-size:14px;",
                   }),
                   $("<br>"),
                   $("<b>", { text: "Items :" }),
-                  $("<span>", { text: order.items.length }),
+                  $("<span>", { text: order.items ? order.items.length : 0 }),
                   $("<br>"),
                   $("<b>", { text: "Customer :" }),
                   $("<span>", {
-                    text:
-                      order.customer != 0
-                        ? order.customer.name
-                        : "Walk in customer",
+                    text: customerName,
                     class: "customer_name",
                   }),
                 ),
@@ -1072,49 +1160,80 @@ if (auth == undefined) {
       $("#refNumber").val("");
 
       if (orderType == 1) {
-        $("#refNumber").val(holdOrderList[index].ref_number);
+        let order = holdOrderList[index];
+        $("#refNumber").val(order.ref_number || "");
+
+        // Fix #7: Handle customer data properly
+        let customerName = "Walk in customer";
+        try {
+          if (order.customer) {
+            if (typeof order.customer === "string") {
+              let parsed = JSON.parse(order.customer);
+              customerName = parsed.name || "Walk in customer";
+            } else if (typeof order.customer === "object" && order.customer.name) {
+              customerName = order.customer.name;
+            }
+          }
+        } catch (e) {
+          console.warn("Error parsing customer data:", e);
+        }
 
         // CUSTOMER DROPDOWN - COMMENTED OUT
         // $("#customer option:selected").removeAttr("selected");
-
         // $("#customer option")
         //   .filter(function () {
-        //     return $(this).text() == "Walk in customer";
+        //     return $(this).text() == customerName;
         //   })
         //   .prop("selected", true);
 
-        holdOrder = holdOrderList[index].id;
+        holdOrder = order.id;
         cart = [];
-        $.each(holdOrderList[index].items, function (index, product) {
+        $.each(order.items || [], function (index, product) {
           item = {
-            id: product.id,
-            product_name: product.product_name,
-            sku: product.sku,
-            price: product.price,
-            quantity: product.quantity,
+            id: product.id || 0,
+            product_name: product.product_name || "Unknown",
+            sku: product.sku || "",
+            price: product.price || 0,
+            quantity: product.quantity || 1,
           };
           cart.push(item);
         });
       } else if (orderType == 2) {
+        let order = customerOrderList[index];
         $("#refNumber").val("");
+
+        // Fix #7: Handle customer data properly for customer orders
+        let customerName = "Walk in customer";
+        try {
+          if (order.customer) {
+            if (typeof order.customer === "string") {
+              let parsed = JSON.parse(order.customer);
+              customerName = parsed.name || "Walk in customer";
+            } else if (typeof order.customer === "object" && order.customer.name) {
+              customerName = order.customer.name;
+            }
+          }
+        } catch (e) {
+          console.warn("Error parsing customer data:", e);
+        }
 
         $("#customer option:selected").removeAttr("selected");
 
         $("#customer option")
           .filter(function () {
-            return $(this).text() == customerOrderList[index].customer.name;
+            return $(this).text() == customerName;
           })
           .prop("selected", true);
 
-        holdOrder = customerOrderList[index].id;
+        holdOrder = order.id;
         cart = [];
-        $.each(customerOrderList[index].items, function (index, product) {
+        $.each(order.items || [], function (index, product) {
           item = {
-            id: product.id,
-            product_name: product.product_name,
-            sku: product.sku,
-            price: product.price,
-            quantity: product.quantity,
+            id: product.id || 0,
+            product_name: product.product_name || "Unknown",
+            sku: product.sku || "",
+            price: product.price || 0,
+            quantity: product.quantity || 1,
           };
           cart.push(item);
         });
@@ -1381,7 +1500,10 @@ if (auth == undefined) {
       $.get(api + "inventory/product/" + id, function (product) {
         $("#category option")
           .filter(function () {
-            return $(this).val() == product.category;
+            return (
+              $(this).val() == product.category ||
+              $(this).val() == product.category_id
+            );
           })
           .prop("selected", true);
 

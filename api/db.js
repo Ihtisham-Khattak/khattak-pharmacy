@@ -39,10 +39,24 @@ migrateDatabase();
 
 const db = new Database(dbPath);
 
+// Enable foreign key constraints - MUST be set on every connection
+function ensureForeignKeysEnabled() {
+  db.pragma("foreign_keys = ON");
+  const status = db.pragma("foreign_keys");
+  return status[0].foreign_keys === 1;
+}
+
+// Enable FK on module load
+ensureForeignKeysEnabled();
+
 /**
  * Initialize the database schema with professional refinements
  */
 function initDB() {
+  // Ensure foreign keys are enabled before schema operations
+  const fkEnabled = ensureForeignKeysEnabled();
+  console.log("Foreign keys enabled:", fkEnabled ? "YES ✓" : "NO ✗");
+
   db.exec(`
     -- Categories Table
     CREATE TABLE IF NOT EXISTS categories (
@@ -63,12 +77,16 @@ function initDB() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Insert default walk-in customer (id=0) if not exists
+    INSERT OR IGNORE INTO customers (id, name, created_at, updated_at)
+    VALUES (0, 'Walk-in Customer', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
     -- Inventory/Products Table
     CREATE TABLE IF NOT EXISTS inventory (
-      id INTEGER PRIMARY KEY, -- Removed AUTOINCREMENT to allow manual ID insertion from code
+      id INTEGER PRIMARY KEY,
       name TEXT NOT NULL,
       generic TEXT,
-      category TEXT, -- Changed back from category_id for compatibility
+      category_id INTEGER,
       price REAL DEFAULT 0,
       quantity INTEGER DEFAULT 0,
       minStock INTEGER DEFAULT 0,
@@ -77,12 +95,13 @@ function initDB() {
       strength TEXT,
       form TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (category_id) REFERENCES categories(id)
     );
 
     -- Users Table
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY, -- Removed AUTOINCREMENT for consistency
+      id INTEGER PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       fullname TEXT,
       password TEXT NOT NULL,
@@ -102,14 +121,16 @@ function initDB() {
       date DATETIME DEFAULT CURRENT_TIMESTAMP,
       user_id INTEGER,
       till INTEGER,
-      status INTEGER DEFAULT 1, -- 1: Completed, 0: Cancelled
+      status INTEGER DEFAULT 1,
       total REAL NOT NULL DEFAULT 0,
       paid REAL DEFAULT 0,
       change REAL DEFAULT 0,
       customer_id INTEGER,
       ref_number TEXT,
-      items TEXT, -- JSON string of items
+      items TEXT,
       payment_type TEXT,
+      discount REAL DEFAULT 0,
+      tax REAL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
@@ -136,7 +157,9 @@ function initDB() {
     -- Create Indexes for performance
     CREATE INDEX IF NOT EXISTS idx_inventory_name ON inventory(name);
     CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
-    CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory(category);
+    CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory(category_id);
+    CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_transactions_customer ON transactions(customer_id);
   `);
 
   console.log("Database initialized successfully at:", dbPath);
@@ -146,4 +169,5 @@ module.exports = {
   db,
   initDB,
   dbPath,
+  ensureForeignKeysEnabled,
 };
