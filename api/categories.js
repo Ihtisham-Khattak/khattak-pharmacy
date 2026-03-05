@@ -4,8 +4,11 @@ const { db, ensureForeignKeysEnabled } = require("./db");
 
 app.use(bodyParser.json());
 
-// Ensure FK is enabled for this API
-ensureForeignKeysEnabled();
+// Ensure FK is enabled for every request
+app.use(function (req, res, next) {
+  ensureForeignKeysEnabled();
+  next();
+});
 
 module.exports = app;
 

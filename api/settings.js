@@ -5,7 +5,7 @@ const sanitizeFilename = require("sanitize-filename");
 const fs = require("fs");
 const path = require("path");
 const validator = require("validator");
-const { db } = require("./db");
+const { db, ensureForeignKeysEnabled } = require("./db");
 
 const appName = process.env.APPNAME || "PharmaSpot";
 const appData = process.env.APPDATA || "";
@@ -13,6 +13,12 @@ const appData = process.env.APPDATA || "";
 const maxFileSize = 2097152; // 2MB
 const defaultLogoName = "logo";
 const { filterFile } = require("../assets/js/utils");
+
+// Ensure FK is enabled for every request
+app.use(function (req, res, next) {
+  ensureForeignKeysEnabled();
+  next();
+});
 
 const storage = multer.diskStorage({
   destination: path.join(appData, appName, "uploads"),
