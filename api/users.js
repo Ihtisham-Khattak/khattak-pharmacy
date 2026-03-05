@@ -3,9 +3,15 @@ const bodyParser = require("body-parser");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 const validator = require("validator");
-const { db } = require("./db");
+const { db, ensureForeignKeysEnabled } = require("./db");
 
 app.use(bodyParser.json());
+
+// Ensure FK is enabled for every request
+app.use(function (req, res, next) {
+  ensureForeignKeysEnabled();
+  next();
+});
 
 module.exports = app;
 
@@ -213,18 +219,17 @@ app.post("/post", function (req, res) {
 /**
  * GET endpoint: Check and initialize the default admin user if not exists.
  */
-app.get("/check", function (req, res) {
+app.get("/check", async function (req, res) {
   try {
     const admin = db.prepare("SELECT * FROM users WHERE id = 1").get();
     if (!admin) {
-      bcrypt.hash("admin", saltRounds).then((hash) => {
-        db.prepare(
-          `
-          INSERT INTO users (id, username, fullname, password, perm_products, perm_categories, perm_transactions, perm_users, perm_settings, status)
-          VALUES (1, 'admin', 'Administrator', ?, 1, 1, 1, 1, 1, '')
-        `,
-        ).run(hash);
-      });
+      const hash = await bcrypt.hash("admin", saltRounds);
+      db.prepare(
+        `
+        INSERT INTO users (id, username, fullname, password, perm_products, perm_categories, perm_transactions, perm_users, perm_settings, status)
+        VALUES (1, 'admin', 'Administrator', ?, 1, 1, 1, 1, 1, '')
+      `,
+      ).run(hash);
     }
     res.sendStatus(200);
   } catch (err) {

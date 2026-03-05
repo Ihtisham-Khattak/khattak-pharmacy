@@ -75,15 +75,89 @@ const permissions = [
   "perm_users",
   "perm_settings",
 ];
+
+// Enhanced Notiflix configuration for better UX
 notiflix.Notify.init({
   position: "right-top",
-  timeout: 5000,
-  cssAnimationDuration: 400,
-  messageMaxLength: 150,
+  timeout: 4000,
+  cssAnimationDuration: 300,
+  messageMaxLength: 200,
   clickToClose: true,
   closeButton: true,
   useIcon: true,
-  showOnlyTheLastOne: true,
+  showOnlyTheLastOne: false,
+  maxNumberOfNotifications: 4,
+  gap: 10,
+  ID: "notiflix-notify",
+  className: "notiflix-notify",
+  zindex: 9999,
+  title: {
+    success: "Success",
+    failure: "Error",
+    warning: "Warning",
+    info: "Info",
+  },
+  message: {
+    success: "Operation completed successfully",
+    failure: "An error occurred",
+    warning: "Please check your input",
+    info: "Here's some information",
+  },
+});
+
+// Enhanced Report configuration
+notiflix.Report.init({
+  className: "notiflix-report",
+  width: "400px",
+  position: "center",
+  distance: "10px",
+  borderRadius: "16px",
+  zindex: 10000,
+  icon: true,
+  showIcon: true,
+  cssAnimation: true,
+  cssAnimationDuration: 300,
+  popupEffect: "scale",
+  buttons: {
+    ok: "OK",
+  },
+  title: {
+    success: "Success",
+    failure: "Error",
+    warning: "Warning",
+    info: "Info",
+  },
+  message: {
+    success: "Operation completed successfully",
+    failure: "An error occurred",
+    warning: "Please check your input",
+    info: "Here's some information",
+  },
+});
+
+// Enhanced Confirm configuration
+notiflix.Confirm.init({
+  className: "notiflix-confirm",
+  width: "400px",
+  position: "center",
+  distance: "10px",
+  borderRadius: "16px",
+  zindex: 10001,
+  icon: true,
+  showIcon: true,
+  cssAnimation: true,
+  cssAnimationDuration: 300,
+  popupEffect: "scale",
+  buttons: {
+    ok: "Confirm",
+    cancel: "Cancel",
+  },
+  title: {
+    confirm: "Confirm Action",
+  },
+  message: {
+    confirm: "Are you sure you want to proceed?",
+  },
 });
 const {
   DATE_FORMAT,

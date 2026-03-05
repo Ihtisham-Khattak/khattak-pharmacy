@@ -6,8 +6,11 @@ const { db, ensureForeignKeysEnabled } = require("./db");
 
 app.use(bodyParser.json());
 
-// Ensure FK is enabled for this API
-ensureForeignKeysEnabled();
+// Ensure FK is enabled for every request
+app.use(function (req, res, next) {
+  ensureForeignKeysEnabled();
+  next();
+});
 
 module.exports = app;
 
@@ -170,13 +173,48 @@ app.delete("/product/:productId", function (req, res) {
  * Decrement inventory quantities based on a list of products in a transaction.
  */
 app.decrementInventory = function (products) {
+  // Ensure FK is enabled
+  ensureForeignKeysEnabled();
+
+  console.log('[decrementInventory] Products received:', JSON.stringify(products));
+
   const updateStmt = db.prepare(
     "UPDATE inventory SET quantity = quantity - ? WHERE id = ?",
   );
+  const checkStmt = db.prepare(
+    "SELECT id, name, category_id FROM inventory WHERE id = ?"
+  );
+  const categoryStmt = db.prepare(
+    "SELECT id FROM categories WHERE id = ?"
+  );
+
   const transaction = db.transaction((products) => {
     for (const product of products) {
-      updateStmt.run(parseInt(product.quantity), parseInt(product.id));
+      const productId = parseInt(product.id);
+      const productQty = parseInt(product.quantity);
+
+      console.log('[decrementInventory] Processing product:', productId, 'qty:', productQty);
+
+      // Validate product exists
+      const invProduct = checkStmt.get(productId);
+      console.log('[decrementInventory] Product found:', invProduct);
+      if (!invProduct) {
+        throw new Error(`Product with ID ${productId} not found in inventory`);
+      }
+
+      // Validate category exists if category_id is set
+      if (invProduct.category_id) {
+        const category = categoryStmt.get(invProduct.category_id);
+        console.log('[decrementInventory] Category found:', category);
+        if (!category) {
+          throw new Error(`Product "${invProduct.name}" has invalid category_id ${invProduct.category_id}`);
+        }
+      }
+
+      console.log('[decrementInventory] Updating product:', productId);
+      updateStmt.run(productQty, productId);
     }
   });
   transaction(products);
+  console.log('[decrementInventory] Success');
 };

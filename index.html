@@ -54,171 +54,172 @@
         </div>
       </div>
     </div>
-    <nav class="navbar navbar-default navbar-static-top m-b-0">
-      <div class="container-fluid">
-        <div class="navbar-header">
-          <button
-            type="button"
-            class="navbar-toggle collapsed"
-            data-toggle="collapse"
-            data-target="#navbar-collapse"
-            aria-expanded="false"
-          >
-            <span class="sr-only">Toggle navigation</span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-          </button>
-          <a class="navbar-brand" href="#"
-            ><img src="assets/images/logo.svg" height="30" alt="SymPharma"
-          /></a>
-        </div>
-
-        <div class="collapse navbar-collapse" id="navbar-collapse">
-          <ul class="nav navbar-nav">
-            <li class="dropdown">
-              <a
-                href="#"
-                class="dropdown-toggle"
-                data-toggle="dropdown"
-                role="button"
-                aria-haspopup="true"
-                aria-expanded="false"
-              >
-                <i class="glyphicon glyphicon-barcode"></i> Products
-                <span class="caret"></span>
-              </a>
-              <ul class="dropdown-menu">
-                <li>
-                  <a
-                    href="#"
-                    id="productModal"
-                    data-toggle="modal"
-                    data-target="#Products"
-                    >View Products</a
-                  >
-                </li>
-                <li>
-                  <a
-                    href="#"
-                    id="newProductModal"
-                    data-toggle="modal"
-                    data-target="#newProduct"
-                    >Add New Product</a
-                  >
-                </li>
-              </ul>
-            </li>
-            <li class="dropdown">
-              <a
-                href="#"
-                class="dropdown-toggle"
-                data-toggle="dropdown"
-                role="button"
-                aria-haspopup="true"
-                aria-expanded="false"
-              >
-                <i class="glyphicon glyphicon-th"></i> Categories
-                <span class="caret"></span>
-              </a>
-              <ul class="dropdown-menu">
-                <li>
-                  <a
-                    href="#"
-                    id="categoryModal"
-                    data-toggle="modal"
-                    data-target="#Categories"
-                    >View Categories</a
-                  >
-                </li>
-                <li>
-                  <a
-                    href="#"
-                    id="newCategoryModal"
-                    data-toggle="modal"
-                    data-target="#newCategory"
-                    >Add New Category</a
-                  >
-                </li>
-              </ul>
-            </li>
-            <li>
-              <a
-                href="#"
-                id="viewRefOrders"
-                data-toggle="modal"
-                data-target="#holdOrdersModal"
-                ><i class="fa fa-shopping-basket"></i> Open Tabs</a
-              >
-            </li>
-            <li>
-              <a
-                href="#"
-                id="viewCustomerOrders"
-                data-toggle="modal"
-                data-target="#customerModal"
-                onclick="$(this).getCustomerOrders()"
-                ><i class="fa fa-shopping-cart"></i> Orders</a
-              >
-            </li>
-          </ul>
-
-          <ul class="nav navbar-nav navbar-right">
-            <li>
-              <a href="#" id="pointofsale"
-                ><i class="glyphicon glyphicon-shopping-cart"></i> POS</a
-              >
-            </li>
-            <li>
-              <a href="#" id="transactions"
-                ><i class="glyphicon glyphicon-credit-card"></i> Transactions</a
-              >
-            </li>
-            <li class="dropdown">
-              <a
-                href="#"
-                class="dropdown-toggle"
-                data-toggle="dropdown"
-                role="button"
-                aria-haspopup="true"
-                aria-expanded="false"
-              >
-                <i class="glyphicon glyphicon-user"></i>
-                <span id="loggedin-user"></span> <span class="caret"></span>
-              </a>
-              <ul class="dropdown-menu">
-                <li><a href="#" id="cashier">My Profile</a></li>
-                <li>
-                  <a
-                    href="#"
-                    id="usersModal"
-                    data-toggle="modal"
-                    data-target="#Users"
-                    >Manage Users</a
-                  >
-                </li>
-                <li>
-                  <a
-                    href="#"
-                    id="settings"
-                    data-toggle="modal"
-                    data-target="#settingsModal"
-                    >Settings</a
-                  >
-                </li>
-                <li role="separator" class="divider"></li>
-                <li>
-                  <a href="#" id="log-out"
-                    ><i class="glyphicon glyphicon-log-out"></i> Log out</a
-                  >
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </nav>
     <div id="main_app">
+      <nav class="navbar navbar-default navbar-static-top m-b-0">
+        <div class="container-fluid">
+          <div class="navbar-header">
+            <button
+              type="button"
+              class="navbar-toggle collapsed"
+              data-toggle="collapse"
+              data-target="#navbar-collapse"
+              aria-expanded="false"
+            >
+              <span class="sr-only">Toggle navigation</span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="#"
+              ><img src="assets/images/logo.svg" height="30" alt="SymPharma"
+            /></a>
+          </div>
+
+          <div class="collapse navbar-collapse" id="navbar-collapse">
+            <ul class="nav navbar-nav">
+              <li class="dropdown">
+                <a
+                  href="#"
+                  class="dropdown-toggle"
+                  data-toggle="dropdown"
+                  role="button"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                >
+                  <i class="glyphicon glyphicon-barcode"></i> Products
+                  <span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu">
+                  <li>
+                    <a
+                      href="#"
+                      id="productModal"
+                      data-toggle="modal"
+                      data-target="#Products"
+                      >View Products</a
+                    >
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      id="newProductModal"
+                      data-toggle="modal"
+                      data-target="#newProduct"
+                      >Add New Product</a
+                    >
+                  </li>
+                </ul>
+              </li>
+              <li class="dropdown">
+                <a
+                  href="#"
+                  class="dropdown-toggle"
+                  data-toggle="dropdown"
+                  role="button"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                >
+                  <i class="glyphicon glyphicon-th"></i> Categories
+                  <span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu">
+                  <li>
+                    <a
+                      href="#"
+                      id="categoryModal"
+                      data-toggle="modal"
+                      data-target="#Categories"
+                      >View Categories</a
+                    >
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      id="newCategoryModal"
+                      data-toggle="modal"
+                      data-target="#newCategory"
+                      >Add New Category</a
+                    >
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  id="viewRefOrders"
+                  data-toggle="modal"
+                  data-target="#holdOrdersModal"
+                  ><i class="fa fa-shopping-basket"></i> Open Tabs</a
+                >
+              </li>
+              <!-- <li>
+                <a
+                  href="#"
+                  id="viewCustomerOrders"
+                  data-toggle="modal"
+                  data-target="#customerModal"
+                  onclick="$(this).getCustomerOrders()"
+                  ><i class="fa fa-shopping-cart"></i> Orders</a
+                >
+              </li> -->
+            </ul>
+
+            <ul class="nav navbar-nav navbar-right">
+              <li>
+                <a href="#" id="pointofsale"
+                  ><i class="glyphicon glyphicon-shopping-cart"></i> POS</a
+                >
+              </li>
+              <li>
+                <a href="#" id="transactions"
+                  ><i class="glyphicon glyphicon-credit-card"></i>
+                  Transactions</a
+                >
+              </li>
+              <li class="dropdown">
+                <a
+                  href="#"
+                  class="dropdown-toggle"
+                  data-toggle="dropdown"
+                  role="button"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                >
+                  <i class="glyphicon glyphicon-user"></i>
+                  <span id="loggedin-user"></span> <span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu">
+                  <li><a href="#" id="cashier">My Profile</a></li>
+                  <li>
+                    <a
+                      href="#"
+                      id="usersModal"
+                      data-toggle="modal"
+                      data-target="#Users"
+                      >Manage Users</a
+                    >
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      id="settings"
+                      data-toggle="modal"
+                      data-target="#settingsModal"
+                      >Settings</a
+                    >
+                  </li>
+                  <li role="separator" class="divider"></li>
+                  <li>
+                    <a href="#" id="log-out"
+                      ><i class="glyphicon glyphicon-log-out"></i> Log out</a
+                    >
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </nav>
       <div class="container">
         <div id="transactions_view">
           <div class="container">
@@ -970,6 +971,7 @@
           </div>
         </div>
       </div>
+      <!-- Product Modal Start -->
       <div
         id="newProduct"
         class="modal fade bs-example-modal-lg"
@@ -991,7 +993,7 @@
               </button>
               <h4 class="modal-title" id="mySmallModalLabel">Product</h4>
             </div>
-            <!-- Product Form -->
+            <!-- Product Form Start -->
             <div class="modal-body">
               <form id="saveProduct" enctype="multipart/form-data">
                 <input type="hidden" name="id" id="product_id" />
@@ -1044,7 +1046,6 @@
                       placeholder="dd/mm/yyyy"
                       class="form-control"
                       id="expirationDate"
-                      readonly
                     />
                   </div>
                 </div>
@@ -1127,11 +1128,13 @@
                 />
               </form>
             </div>
-
-            <!-- Product End -->
+            <!-- Product Form End -->
           </div>
         </div>
       </div>
+      <!-- Product Modal End -->
+
+      <!-- Category Modal Start -->
       <div
         id="newCategory"
         class="modal fade bs-example-modal-sm"
@@ -1177,6 +1180,9 @@
           </div>
         </div>
       </div>
+      <!-- Category Modal End -->
+
+
       <div
         id="Products"
         class="modal fade bs-example-modal-sm"
@@ -1185,7 +1191,7 @@
         aria-labelledby="mySmallModalLabel"
         aria-hidden="true"
       >
-        <div class="modal-dialog modal-lg">
+        <div clasEnds="modal-dialog modal-lg">
           <div class="modal-content">
             <div class="modal-header">
               <button
