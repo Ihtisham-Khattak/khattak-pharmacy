@@ -12,6 +12,40 @@ app.use(function (req, res, next) {
   next();
 });
 
+/**
+ * Synchronize the out of stock table when product quantities change.
+ */
+function syncOutOfStock(db, productId) {
+  const product = db.prepare("SELECT * FROM inventory WHERE id = ?").get(productId);
+  if (!product) {
+    db.prepare("DELETE FROM out_of_stock_products WHERE product_id = ?").run(productId);
+    return;
+  }
+  const isOutOfStock = product.quantity <= product.minStock;
+  if (isOutOfStock) {
+    const existing = db.prepare("SELECT id FROM out_of_stock_products WHERE product_id = ?").get(productId);
+    if (existing) {
+      db.prepare(`
+        UPDATE out_of_stock_products SET
+          product_name = ?,
+          strength = ?,
+          type = ?,
+          minimum_quantity = ?,
+          current_quantity = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(product.name, product.strength || null, product.form || null, product.minStock, product.quantity, existing.id);
+    } else {
+      db.prepare(`
+        INSERT INTO out_of_stock_products (product_id, product_name, strength, type, minimum_quantity, current_quantity)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(product.id, product.name, product.strength || null, product.form || null, product.minStock, product.quantity);
+    }
+  } else {
+    db.prepare("DELETE FROM out_of_stock_products WHERE product_id = ?").run(product.id);
+  }
+}
+
 module.exports = app;
 
 /**
@@ -121,6 +155,7 @@ app.post("/product", function (req, res) {
         strength,
         form,
       );
+      syncOutOfStock(db, newId);
       res.sendStatus(200);
     } else {
       db.prepare(
@@ -144,6 +179,7 @@ app.post("/product", function (req, res) {
         form,
         parseInt(id),
       );
+      syncOutOfStock(db, parseInt(id));
       res.sendStatus(200);
     }
   } catch (err) {
@@ -213,6 +249,7 @@ app.decrementInventory = function (products) {
 
       console.log('[decrementInventory] Updating product:', productId);
       updateStmt.run(productQty, productId);
+      syncOutOfStock(db, productId);
     }
   });
   transaction(products);

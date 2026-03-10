@@ -47,6 +47,7 @@ express.use("/api/customers", require("./api/customers"));
 express.use("/api/categories", require("./api/categories"));
 express.use("/api/settings", require("./api/settings"));
 express.use("/api/users", require("./api/users"));
+express.use("/api/out-of-stock", require("./api/outOfStock"));
 express.use("/api", require("./api/transactions"));
 
 server.listen(PORT, () => {
