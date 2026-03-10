@@ -168,12 +168,29 @@ function initDB() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Out of Stock Products Table
+    CREATE TABLE IF NOT EXISTS out_of_stock_products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      product_name TEXT NOT NULL,
+      strength TEXT,
+      type TEXT,
+      minimum_quantity INTEGER NOT NULL DEFAULT 0,
+      current_quantity INTEGER NOT NULL DEFAULT 0,
+      reorder_quantity INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES inventory(id) ON DELETE CASCADE
+    );
+
     -- Create Indexes for performance
     CREATE INDEX IF NOT EXISTS idx_inventory_name ON inventory(name);
     CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
     CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory(category_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_customer ON transactions(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_out_of_stock_product ON out_of_stock_products(product_id);
+    CREATE INDEX IF NOT EXISTS idx_out_of_stock_quantity ON out_of_stock_products(current_quantity);
   `);
 
   // Migration: Fix broken audit_inventory_update trigger.

@@ -152,6 +152,11 @@
                   ><i class="fa fa-shopping-basket"></i> Open Tabs</a
                 >
               </li>
+              <li>
+                <a href="#" id="outOfStockLink"
+                  ><i class="fa fa-exclamation-triangle"></i> Out of Stock</a
+                >
+              </li>
               <!-- <li>
                 <a
                   href="#"
@@ -470,6 +475,70 @@
                 </div>
                 <hr />
                 <div class="row" id="parent"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="out_of_stock_view" style="display: none;">
+          <div class="row m-t-20">
+            <div class="col-md-12">
+              <div class="card-box">
+                <div class="row">
+                  <div class="col-md-3">
+                    <h3 style="margin-top:0;">Out of Stock</h3>
+                  </div>
+                  <div class="col-md-2">
+                    <input type="text" id="outOfStockSearch" class="form-control" placeholder="Search by name">
+                  </div>
+                  <div class="col-md-2">
+                    <select id="outOfStockTypeFilter" class="form-control">
+                      <option value="">All Types</option>
+                      <option value="Tablet">Tablet</option>
+                      <option value="Capsule">Capsule</option>
+                      <option value="Syrup">Syrup</option>
+                      <option value="Injection">Injection</option>
+                      <option value="Drops">Drops</option>
+                      <option value="Ointment">Ointment</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <select id="outOfStockSort" class="form-control">
+                      <option value="lowest_first">Lowest Qty First</option>
+                      <option value="highest_first">Highest Qty First</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3 text-right">
+                    <div class="btn-group">
+                      <button id="exportOosCsv" class="btn btn-default"><i class="fa fa-file-excel-o"></i> CSV</button>
+                      <button id="exportOosPdf" class="btn btn-default"><i class="fa fa-file-pdf-o"></i> PDF</button>
+                    </div>
+                  </div>
+                </div>
+                <hr>
+                <div class="table-responsive">
+                  <table class="table table-striped table-bordered" id="outOfStockTable">
+                    <thead>
+                      <tr>
+                        <th>Product Name</th>
+                        <th>Strength</th>
+                        <th>Type</th>
+                        <th style="width: 15%;">Reorder Quantity</th>
+                        <th style="width: 10%;">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="outOfStockTableBody">
+                    </tbody>
+                  </table>
+                  <div id="outOfStockEmptyMessage" class="text-center p-20" style="display:none;">
+                    <h4>No products are currently out of stock.</h4>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-md-12 text-right">
+                    <ul class="pagination m-0" id="outOfStockPagination">
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

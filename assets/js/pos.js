@@ -1452,6 +1452,7 @@ if (auth == undefined) {
       loadUserList();
 
       $("#pos_view").hide();
+      $("#out_of_stock_view").hide();
       $("#pointofsale").show();
       $("#transactions_view").show();
       $(this).hide();
@@ -1459,9 +1460,21 @@ if (auth == undefined) {
 
     $("#pointofsale").on("click", function () {
       $("#pos_view").show();
+      $("#out_of_stock_view").hide();
       $("#transactions").show();
       $("#transactions_view").hide();
       $(this).hide();
+    });
+
+    $("#outOfStockLink").on("click", function (e) {
+      e.preventDefault();
+      loadOutOfStock();
+      
+      $("#pos_view").hide();
+      $("#transactions_view").hide();
+      $("#transactions").show();
+      $("#pointofsale").show();
+      $("#out_of_stock_view").show();
     });
 
     $("#viewRefOrders").on("click", function () {
@@ -2632,6 +2645,198 @@ $("#reportrange").on("apply.daterangepicker", function (ev, picker) {
 
   loadTransactions();
 });
+
+  // --- Out of Stock Module Logic ---
+  
+  function loadOutOfStock(page = 1) {
+    let limit = 10;
+    let query = $("#outOfStockSearch").val() || "";
+    let typeFilter = $("#outOfStockTypeFilter").val() || "";
+    let sort = $("#outOfStockSort").val() || "lowest_first";
+    
+    let url = api + "out-of-stock?page=" + page + "&limit=" + limit;
+    if (query !== "") url += "&q=" + encodeURIComponent(query);
+    if (typeFilter !== "") url += "&type=" + encodeURIComponent(typeFilter);
+    if (sort !== "") url += "&sort=" + encodeURIComponent(sort);
+
+    $.get(url, function (response) {
+      let data = response.data;
+      let total = response.total;
+
+      $("#outOfStockTableBody").empty();
+      
+      if (data.length === 0) {
+        $("#outOfStockTable").hide();
+        $("#outOfStockEmptyMessage").show();
+        $("#outOfStockPagination").hide();
+      } else {
+        $("#outOfStockTable").show();
+        $("#outOfStockEmptyMessage").hide();
+        $("#outOfStockPagination").show();
+        
+        data.forEach((item) => {
+          let isCritical = item.current_quantity === 0;
+          let rowClass = isCritical ? "bg-danger" : "";
+          
+          let row = `<tr class="${rowClass}">
+              <td>${item.product_name}</td>
+              <td>${item.strength ? item.strength : "N/A"}</td>
+              <td>${item.type ? item.type : "N/A"}</td>
+              <td>
+                <input type="number" min="0" class="form-control text-center out-of-stock-reorder" 
+                  data-id="${item.id}" value="${item.reorder_quantity || ""}" placeholder="Qty">
+              </td>
+              <td>
+                <button class="btn btn-primary btn-sm save-reorder-btn" data-id="${item.id}">
+                    <i class="fa fa-save"></i> Save
+                </button>
+              </td>
+          </tr>`;
+          $("#outOfStockTableBody").append(row);
+        });
+        
+        // Render custom pagination since renderPagination uses a different target structure sometimes
+        renderOutOfStockPagination(total, limit, page);
+      }
+    }).fail(function() {
+      notiflix.Notify.failure("Failed to fetch Out of Stock products");
+    });
+  }
+
+  function renderOutOfStockPagination(total, limit, page) {
+    let pages = Math.ceil(total / limit);
+    let html = "";
+    
+    if (pages > 1) {
+      let prev = page - 1;
+      let next = page + 1;
+      let disabledPrev = page == 1 ? "disabled" : "";
+      let disabledNext = page >= pages ? "disabled" : "";
+
+      html += `<li class="${disabledPrev}"><a href="#" class="oos-pagination-btn" data-page="${prev}">Previous</a></li>`;
+      html += `<li class="active"><a href="#">Page ${page} of ${pages}</a></li>`;
+      html += `<li class="${disabledNext}"><a href="#" class="oos-pagination-btn" data-page="${next}">Next</a></li>`;
+    }
+
+    $("#outOfStockPagination").html(html);
+  }
+
+  $(document).on("click", ".oos-pagination-btn", function (e) {
+    e.preventDefault();
+    if($(this).parent().hasClass("disabled")) return;
+    let page = $(this).data("page");
+    loadOutOfStock(page);
+  });
+
+  let oosSearchTimeout;
+  $("#outOfStockSearch").on("input", function () {
+    clearTimeout(oosSearchTimeout);
+    oosSearchTimeout = setTimeout(() => {
+      loadOutOfStock(1);
+    }, 300);
+  });
+
+  $("#outOfStockTypeFilter, #outOfStockSort").on("change", function () {
+    loadOutOfStock(1);
+  });
+
+  $("#exportOosCsv, #exportOosPdf").on("click", function (e) {
+    e.preventDefault();
+    let format = $(this).attr("id") === "exportOosCsv" ? "csv" : "pdf";
+    let query = $("#outOfStockSearch").val() || "";
+    let typeFilter = $("#outOfStockTypeFilter").val() || "";
+    let sort = $("#outOfStockSort").val() || "lowest_first";
+    
+    let url = api + "out-of-stock?page=1&limit=10000";
+    if (query !== "") url += "&q=" + encodeURIComponent(query);
+    if (typeFilter !== "") url += "&type=" + encodeURIComponent(typeFilter);
+    if (sort !== "") url += "&sort=" + encodeURIComponent(sort);
+
+    let btn = $(this);
+    let originalHtml = btn.html();
+    btn.html('<i class="fa fa-spinner fa-spin"></i>');
+    btn.prop("disabled", true);
+
+    $.get(url, function (response) {
+      btn.html(originalHtml);
+      btn.prop("disabled", false);
+
+      let data = response.data;
+      if (data.length === 0) {
+        notiflix.Notify.warning("No data to export");
+        return;
+      }
+      
+      let tempTableId = "tempExportTable_" + Date.now();
+      let tempTable = $(`<table id="${tempTableId}">
+        <thead><tr><th>Product Name</th><th>Strength</th><th>Type</th><th>Reorder Quantity</th></tr></thead>
+        <tbody></tbody>
+      </table>`);
+      
+      data.forEach(item => {
+        tempTable.find("tbody").append(`<tr>
+          <td>${item.product_name}</td>
+          <td>${item.strength || "N/A"}</td>
+          <td>${item.type || "N/A"}</td>
+          <td>${item.reorder_quantity || ""}</td>
+        </tr>`);
+      });
+      
+      $("body").append(tempTable);
+      tempTable.hide();
+      
+      let dt = tempTable.DataTable({
+        dom: "Bfrtip",
+        buttons: [
+           { extend: "csv", title: "Out_of_Stock_Products" },
+           { extend: "pdf", title: "Out_of_Stock_Products" }
+        ]
+      });
+      
+      if (format === 'csv') {
+        dt.button('.buttons-csv').trigger();
+      } else {
+        dt.button('.buttons-pdf').trigger();
+      }
+      
+      setTimeout(() => {
+        dt.destroy();
+        tempTable.remove();
+      }, 1000);
+    }).fail(function() {
+      btn.html(originalHtml);
+      btn.prop("disabled", false);
+      notiflix.Notify.failure("Failed to fetch data for export");
+    });
+  });
+
+  $(document).on("click", ".save-reorder-btn", function() {
+    let id = $(this).data("id");
+    let inputField = $(this).closest("tr").find(".out-of-stock-reorder");
+    let reorderValue = inputField.val();
+    
+    let btn = $(this);
+    let originalHtml = btn.html();
+    btn.html('<i class="fa fa-spinner fa-spin"></i>');
+    btn.prop("disabled", true);
+    
+    $.ajax({
+      url: api + "out-of-stock/" + id,
+      type: "PUT",
+      data: JSON.stringify({ reorder_quantity: reorderValue }),
+      contentType: "application/json; charset=utf-8",
+      success: function() {
+        notiflix.Notify.success("Reorder quantity saved!");
+        btn.html(originalHtml);
+        btn.prop("disabled", false);
+      },
+      error: function() {
+        notiflix.Notify.failure("Failed to save reorder quantity.");
+        btn.html(originalHtml);
+        btn.prop("disabled", false);
+      }
+    });
+  });
 
 function authenticate() {
   $(".loading").hide();
