@@ -470,8 +470,8 @@ if (auth == undefined) {
         );
 
         data.forEach((item) => {
-          if (!categories.includes(item.category)) {
-            categories.push(item.category);
+          if (!categories.includes(item.category_id)) {
+            categories.push(item.category_id);
           }
 
           let item_isExpired = isExpired(item.expirationDate);
@@ -1588,7 +1588,6 @@ if (auth == undefined) {
         $("#category option")
           .filter(function () {
             return (
-              $(this).val() == product.category ||
               $(this).val() == product.category_id
             );
           })
@@ -1828,7 +1827,7 @@ if (auth == undefined) {
           counter++;
 
           let category = allCategories.filter(function (cat) {
-            return parseInt(cat.id) === parseInt(product.category);
+            return parseInt(cat.id) === parseInt(product.category_id);
           });
 
           product.stockAlert = "";

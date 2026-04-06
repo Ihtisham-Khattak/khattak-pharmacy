@@ -294,6 +294,8 @@
                   </div>
                 </div>
               </div>
+
+              <!-- Transaction Details Start -->
               <div class="col-md-8" id="transactionDetails">
                 <div class="card-box">
                   <div class="card-title">
@@ -479,16 +481,21 @@
             </div>
           </div>
         </div>
-        <div id="out_of_stock_view" style="display: none;">
+        <div id="out_of_stock_view" style="display: none">
           <div class="row m-t-20">
             <div class="col-md-12">
               <div class="card-box">
                 <div class="row">
                   <div class="col-md-3">
-                    <h3 style="margin-top:0;">Out of Stock</h3>
+                    <h3 style="margin-top: 0">Out of Stock</h3>
                   </div>
                   <div class="col-md-2">
-                    <input type="text" id="outOfStockSearch" class="form-control" placeholder="Search by name">
+                    <input
+                      type="text"
+                      id="outOfStockSearch"
+                      class="form-control"
+                      placeholder="Search by name"
+                    />
                   </div>
                   <div class="col-md-2">
                     <select id="outOfStockTypeFilter" class="form-control">
@@ -509,34 +516,43 @@
                   </div>
                   <div class="col-md-3 text-right">
                     <div class="btn-group">
-                      <button id="exportOosCsv" class="btn btn-default"><i class="fa fa-file-excel-o"></i> CSV</button>
-                      <button id="exportOosPdf" class="btn btn-default"><i class="fa fa-file-pdf-o"></i> PDF</button>
+                      <button id="exportOosCsv" class="btn btn-default">
+                        <i class="fa fa-file-excel-o"></i> CSV
+                      </button>
+                      <button id="exportOosPdf" class="btn btn-default">
+                        <i class="fa fa-file-pdf-o"></i> PDF
+                      </button>
                     </div>
                   </div>
                 </div>
-                <hr>
+                <hr />
                 <div class="table-responsive">
-                  <table class="table table-striped table-bordered" id="outOfStockTable">
+                  <table
+                    class="table table-striped table-bordered"
+                    id="outOfStockTable"
+                  >
                     <thead>
                       <tr>
                         <th>Product Name</th>
                         <th>Strength</th>
                         <th>Type</th>
-                        <th style="width: 15%;">Reorder Quantity</th>
-                        <th style="width: 10%;">Action</th>
+                        <th style="width: 15%">Reorder Quantity</th>
+                        <th style="width: 10%">Action</th>
                       </tr>
                     </thead>
-                    <tbody id="outOfStockTableBody">
-                    </tbody>
+                    <tbody id="outOfStockTableBody"></tbody>
                   </table>
-                  <div id="outOfStockEmptyMessage" class="text-center p-20" style="display:none;">
+                  <div
+                    id="outOfStockEmptyMessage"
+                    class="text-center p-20"
+                    style="display: none"
+                  >
                     <h4>No products are currently out of stock.</h4>
                   </div>
                 </div>
                 <div class="row">
                   <div class="col-md-12 text-right">
-                    <ul class="pagination m-0" id="outOfStockPagination">
-                    </ul>
+                    <ul class="pagination m-0" id="outOfStockPagination"></ul>
                   </div>
                 </div>
               </div>
@@ -1173,12 +1189,6 @@
                 <!-- Row 5 -->
                 <div class="row">
                   <div class="form-group col-md-6">
-                    <label>
-                      <input type="checkbox" name="stock" id="stock" />
-                      Disable stock check
-                    </label>
-                  </div>
-                  <div class="form-group col-md-6">
                     <label for="productGeneric">Generic</label>
                     <input
                       type="text"
@@ -1187,6 +1197,12 @@
                       class="form-control"
                       id="productGeneric"
                     />
+                  </div>
+                  <div class="form-group col-md-6">
+                    <label>
+                      <input type="checkbox" name="stock" id="stock" />
+                      Disable stock check
+                    </label>
                   </div>
                 </div>
 
@@ -1251,7 +1267,7 @@
       </div>
       <!-- Category Modal End -->
 
-
+      <!-- Add Product Start -->
       <div
         id="Products"
         class="modal fade bs-example-modal-sm"
@@ -1307,6 +1323,7 @@
           </div>
         </div>
       </div>
+      <!-- Product End -->
       <div
         id="Users"
         class="modal fade bs-example-modal-sm"
