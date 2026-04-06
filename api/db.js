@@ -49,6 +49,20 @@ function ensureForeignKeysEnabled() {
 // Enable FK on module load
 ensureForeignKeysEnabled();
 
+// Ensure FK is enabled before every prepare/exec operation
+const originalPrepare = db.prepare.bind(db);
+const originalExec = db.exec.bind(db);
+
+db.prepare = function (sql) {
+  ensureForeignKeysEnabled();
+  return originalPrepare(sql);
+};
+
+db.exec = function (sql) {
+  ensureForeignKeysEnabled();
+  return originalExec(sql);
+};
+
 /**
  * Initialize the database schema with professional refinements
  */
@@ -125,7 +139,7 @@ function initDB() {
       total REAL NOT NULL DEFAULT 0,
       paid REAL DEFAULT 0,
       change REAL DEFAULT 0,
-      customer_id INTEGER,
+      customer_id INTEGER DEFAULT 0,
       ref_number TEXT,
       items TEXT,
       payment_type TEXT,
@@ -154,12 +168,49 @@ function initDB() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Out of Stock Products Table
+    CREATE TABLE IF NOT EXISTS out_of_stock_products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      product_name TEXT NOT NULL,
+      strength TEXT,
+      type TEXT,
+      minimum_quantity INTEGER NOT NULL DEFAULT 0,
+      current_quantity INTEGER NOT NULL DEFAULT 0,
+      reorder_quantity INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES inventory(id) ON DELETE CASCADE
+    );
+
     -- Create Indexes for performance
     CREATE INDEX IF NOT EXISTS idx_inventory_name ON inventory(name);
     CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
     CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory(category_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id);
     CREATE INDEX IF NOT EXISTS idx_transactions_customer ON transactions(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_out_of_stock_product ON out_of_stock_products(product_id);
+    CREATE INDEX IF NOT EXISTS idx_out_of_stock_quantity ON out_of_stock_products(current_quantity);
+  `);
+
+  // Migration: Fix broken audit_inventory_update trigger.
+  // The original trigger used NEW.id (product id) as user_id in audit_log,
+  // which violates the FK constraint audit_log.user_id → users(id).
+  // We recreate it using NULL so the FK check is skipped (user is unknown in this context).
+  db.exec(`
+    DROP TRIGGER IF EXISTS audit_inventory_update;
+    CREATE TRIGGER audit_inventory_update
+      AFTER UPDATE ON inventory BEGIN
+        INSERT INTO audit_log (user_id, action, table_name, record_id, old_value, new_value)
+        VALUES (
+          NULL,
+          'INVENTORY_UPDATED',
+          'inventory',
+          NEW.id,
+          json_object('quantity', OLD.quantity, 'price', OLD.price),
+          json_object('quantity', NEW.quantity, 'price', NEW.price)
+        );
+      END;
   `);
 
   console.log("Database initialized successfully at:", dbPath);

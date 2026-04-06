@@ -6,8 +6,45 @@ const { db, ensureForeignKeysEnabled } = require("./db");
 
 app.use(bodyParser.json());
 
-// Ensure FK is enabled for this API
-ensureForeignKeysEnabled();
+// Ensure FK is enabled for every request
+app.use(function (req, res, next) {
+  ensureForeignKeysEnabled();
+  next();
+});
+
+/**
+ * Synchronize the out of stock table when product quantities change.
+ */
+function syncOutOfStock(db, productId) {
+  const product = db.prepare("SELECT * FROM inventory WHERE id = ?").get(productId);
+  if (!product) {
+    db.prepare("DELETE FROM out_of_stock_products WHERE product_id = ?").run(productId);
+    return;
+  }
+  const isOutOfStock = product.quantity <= product.minStock;
+  if (isOutOfStock) {
+    const existing = db.prepare("SELECT id FROM out_of_stock_products WHERE product_id = ?").get(productId);
+    if (existing) {
+      db.prepare(`
+        UPDATE out_of_stock_products SET
+          product_name = ?,
+          strength = ?,
+          type = ?,
+          minimum_quantity = ?,
+          current_quantity = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(product.name, product.strength || null, product.form || null, product.minStock, product.quantity, existing.id);
+    } else {
+      db.prepare(`
+        INSERT INTO out_of_stock_products (product_id, product_name, strength, type, minimum_quantity, current_quantity)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(product.id, product.name, product.strength || null, product.form || null, product.minStock, product.quantity);
+    }
+  } else {
+    db.prepare("DELETE FROM out_of_stock_products WHERE product_id = ?").run(product.id);
+  }
+}
 
 module.exports = app;
 
@@ -118,6 +155,7 @@ app.post("/product", function (req, res) {
         strength,
         form,
       );
+      syncOutOfStock(db, newId);
       res.sendStatus(200);
     } else {
       db.prepare(
@@ -141,6 +179,7 @@ app.post("/product", function (req, res) {
         form,
         parseInt(id),
       );
+      syncOutOfStock(db, parseInt(id));
       res.sendStatus(200);
     }
   } catch (err) {
@@ -170,13 +209,49 @@ app.delete("/product/:productId", function (req, res) {
  * Decrement inventory quantities based on a list of products in a transaction.
  */
 app.decrementInventory = function (products) {
+  // Ensure FK is enabled
+  ensureForeignKeysEnabled();
+
+  console.log('[decrementInventory] Products received:', JSON.stringify(products));
+
   const updateStmt = db.prepare(
     "UPDATE inventory SET quantity = quantity - ? WHERE id = ?",
   );
+  const checkStmt = db.prepare(
+    "SELECT id, name, category_id FROM inventory WHERE id = ?"
+  );
+  const categoryStmt = db.prepare(
+    "SELECT id FROM categories WHERE id = ?"
+  );
+
   const transaction = db.transaction((products) => {
     for (const product of products) {
-      updateStmt.run(parseInt(product.quantity), parseInt(product.id));
+      const productId = parseInt(product.id);
+      const productQty = parseInt(product.quantity);
+
+      console.log('[decrementInventory] Processing product:', productId, 'qty:', productQty);
+
+      // Validate product exists
+      const invProduct = checkStmt.get(productId);
+      console.log('[decrementInventory] Product found:', invProduct);
+      if (!invProduct) {
+        throw new Error(`Product with ID ${productId} not found in inventory`);
+      }
+
+      // Validate category exists if category_id is set
+      if (invProduct.category_id) {
+        const category = categoryStmt.get(invProduct.category_id);
+        console.log('[decrementInventory] Category found:', category);
+        if (!category) {
+          throw new Error(`Product "${invProduct.name}" has invalid category_id ${invProduct.category_id}`);
+        }
+      }
+
+      console.log('[decrementInventory] Updating product:', productId);
+      updateStmt.run(productQty, productId);
+      syncOutOfStock(db, productId);
     }
   });
   transaction(products);
+  console.log('[decrementInventory] Success');
 };

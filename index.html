@@ -54,171 +54,177 @@
         </div>
       </div>
     </div>
-    <nav class="navbar navbar-default navbar-static-top m-b-0">
-      <div class="container-fluid">
-        <div class="navbar-header">
-          <button
-            type="button"
-            class="navbar-toggle collapsed"
-            data-toggle="collapse"
-            data-target="#navbar-collapse"
-            aria-expanded="false"
-          >
-            <span class="sr-only">Toggle navigation</span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-          </button>
-          <a class="navbar-brand" href="#"
-            ><img src="assets/images/logo.svg" height="30" alt="SymPharma"
-          /></a>
-        </div>
-
-        <div class="collapse navbar-collapse" id="navbar-collapse">
-          <ul class="nav navbar-nav">
-            <li class="dropdown">
-              <a
-                href="#"
-                class="dropdown-toggle"
-                data-toggle="dropdown"
-                role="button"
-                aria-haspopup="true"
-                aria-expanded="false"
-              >
-                <i class="glyphicon glyphicon-barcode"></i> Products
-                <span class="caret"></span>
-              </a>
-              <ul class="dropdown-menu">
-                <li>
-                  <a
-                    href="#"
-                    id="productModal"
-                    data-toggle="modal"
-                    data-target="#Products"
-                    >View Products</a
-                  >
-                </li>
-                <li>
-                  <a
-                    href="#"
-                    id="newProductModal"
-                    data-toggle="modal"
-                    data-target="#newProduct"
-                    >Add New Product</a
-                  >
-                </li>
-              </ul>
-            </li>
-            <li class="dropdown">
-              <a
-                href="#"
-                class="dropdown-toggle"
-                data-toggle="dropdown"
-                role="button"
-                aria-haspopup="true"
-                aria-expanded="false"
-              >
-                <i class="glyphicon glyphicon-th"></i> Categories
-                <span class="caret"></span>
-              </a>
-              <ul class="dropdown-menu">
-                <li>
-                  <a
-                    href="#"
-                    id="categoryModal"
-                    data-toggle="modal"
-                    data-target="#Categories"
-                    >View Categories</a
-                  >
-                </li>
-                <li>
-                  <a
-                    href="#"
-                    id="newCategoryModal"
-                    data-toggle="modal"
-                    data-target="#newCategory"
-                    >Add New Category</a
-                  >
-                </li>
-              </ul>
-            </li>
-            <li>
-              <a
-                href="#"
-                id="viewRefOrders"
-                data-toggle="modal"
-                data-target="#holdOrdersModal"
-                ><i class="fa fa-shopping-basket"></i> Open Tabs</a
-              >
-            </li>
-            <li>
-              <a
-                href="#"
-                id="viewCustomerOrders"
-                data-toggle="modal"
-                data-target="#customerModal"
-                onclick="$(this).getCustomerOrders()"
-                ><i class="fa fa-shopping-cart"></i> Orders</a
-              >
-            </li>
-          </ul>
-
-          <ul class="nav navbar-nav navbar-right">
-            <li>
-              <a href="#" id="pointofsale"
-                ><i class="glyphicon glyphicon-shopping-cart"></i> POS</a
-              >
-            </li>
-            <li>
-              <a href="#" id="transactions"
-                ><i class="glyphicon glyphicon-credit-card"></i> Transactions</a
-              >
-            </li>
-            <li class="dropdown">
-              <a
-                href="#"
-                class="dropdown-toggle"
-                data-toggle="dropdown"
-                role="button"
-                aria-haspopup="true"
-                aria-expanded="false"
-              >
-                <i class="glyphicon glyphicon-user"></i>
-                <span id="loggedin-user"></span> <span class="caret"></span>
-              </a>
-              <ul class="dropdown-menu">
-                <li><a href="#" id="cashier">My Profile</a></li>
-                <li>
-                  <a
-                    href="#"
-                    id="usersModal"
-                    data-toggle="modal"
-                    data-target="#Users"
-                    >Manage Users</a
-                  >
-                </li>
-                <li>
-                  <a
-                    href="#"
-                    id="settings"
-                    data-toggle="modal"
-                    data-target="#settingsModal"
-                    >Settings</a
-                  >
-                </li>
-                <li role="separator" class="divider"></li>
-                <li>
-                  <a href="#" id="log-out"
-                    ><i class="glyphicon glyphicon-log-out"></i> Log out</a
-                  >
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </nav>
     <div id="main_app">
+      <nav class="navbar navbar-default navbar-static-top m-b-0">
+        <div class="container-fluid">
+          <div class="navbar-header">
+            <button
+              type="button"
+              class="navbar-toggle collapsed"
+              data-toggle="collapse"
+              data-target="#navbar-collapse"
+              aria-expanded="false"
+            >
+              <span class="sr-only">Toggle navigation</span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="#"
+              ><img src="assets/images/logo.svg" height="30" alt="SymPharma"
+            /></a>
+          </div>
+
+          <div class="collapse navbar-collapse" id="navbar-collapse">
+            <ul class="nav navbar-nav">
+              <li class="dropdown">
+                <a
+                  href="#"
+                  class="dropdown-toggle"
+                  data-toggle="dropdown"
+                  role="button"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                >
+                  <i class="glyphicon glyphicon-barcode"></i> Products
+                  <span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu">
+                  <li>
+                    <a
+                      href="#"
+                      id="productModal"
+                      data-toggle="modal"
+                      data-target="#Products"
+                      >View Products</a
+                    >
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      id="newProductModal"
+                      data-toggle="modal"
+                      data-target="#newProduct"
+                      >Add New Product</a
+                    >
+                  </li>
+                </ul>
+              </li>
+              <li class="dropdown">
+                <a
+                  href="#"
+                  class="dropdown-toggle"
+                  data-toggle="dropdown"
+                  role="button"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                >
+                  <i class="glyphicon glyphicon-th"></i> Categories
+                  <span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu">
+                  <li>
+                    <a
+                      href="#"
+                      id="categoryModal"
+                      data-toggle="modal"
+                      data-target="#Categories"
+                      >View Categories</a
+                    >
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      id="newCategoryModal"
+                      data-toggle="modal"
+                      data-target="#newCategory"
+                      >Add New Category</a
+                    >
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  id="viewRefOrders"
+                  data-toggle="modal"
+                  data-target="#holdOrdersModal"
+                  ><i class="fa fa-shopping-basket"></i> Open Tabs</a
+                >
+              </li>
+              <li>
+                <a href="#" id="outOfStockLink"
+                  ><i class="fa fa-exclamation-triangle"></i> Out of Stock</a
+                >
+              </li>
+              <!-- <li>
+                <a
+                  href="#"
+                  id="viewCustomerOrders"
+                  data-toggle="modal"
+                  data-target="#customerModal"
+                  onclick="$(this).getCustomerOrders()"
+                  ><i class="fa fa-shopping-cart"></i> Orders</a
+                >
+              </li> -->
+            </ul>
+
+            <ul class="nav navbar-nav navbar-right">
+              <li>
+                <a href="#" id="pointofsale"
+                  ><i class="glyphicon glyphicon-shopping-cart"></i> POS</a
+                >
+              </li>
+              <li>
+                <a href="#" id="transactions"
+                  ><i class="glyphicon glyphicon-credit-card"></i>
+                  Transactions</a
+                >
+              </li>
+              <li class="dropdown">
+                <a
+                  href="#"
+                  class="dropdown-toggle"
+                  data-toggle="dropdown"
+                  role="button"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                >
+                  <i class="glyphicon glyphicon-user"></i>
+                  <span id="loggedin-user"></span> <span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu">
+                  <li><a href="#" id="cashier">My Profile</a></li>
+                  <li>
+                    <a
+                      href="#"
+                      id="usersModal"
+                      data-toggle="modal"
+                      data-target="#Users"
+                      >Manage Users</a
+                    >
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      id="settings"
+                      data-toggle="modal"
+                      data-target="#settingsModal"
+                      >Settings</a
+                    >
+                  </li>
+                  <li role="separator" class="divider"></li>
+                  <li>
+                    <a href="#" id="log-out"
+                      ><i class="glyphicon glyphicon-log-out"></i> Log out</a
+                    >
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </nav>
       <div class="container">
         <div id="transactions_view">
           <div class="container">
@@ -288,6 +294,8 @@
                   </div>
                 </div>
               </div>
+
+              <!-- Transaction Details Start -->
               <div class="col-md-8" id="transactionDetails">
                 <div class="card-box">
                   <div class="card-title">
@@ -469,6 +477,84 @@
                 </div>
                 <hr />
                 <div class="row" id="parent"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="out_of_stock_view" style="display: none">
+          <div class="row m-t-20">
+            <div class="col-md-12">
+              <div class="card-box">
+                <div class="row">
+                  <div class="col-md-3">
+                    <h3 style="margin-top: 0">Out of Stock</h3>
+                  </div>
+                  <div class="col-md-2">
+                    <input
+                      type="text"
+                      id="outOfStockSearch"
+                      class="form-control"
+                      placeholder="Search by name"
+                    />
+                  </div>
+                  <div class="col-md-2">
+                    <select id="outOfStockTypeFilter" class="form-control">
+                      <option value="">All Types</option>
+                      <option value="Tablet">Tablet</option>
+                      <option value="Capsule">Capsule</option>
+                      <option value="Syrup">Syrup</option>
+                      <option value="Injection">Injection</option>
+                      <option value="Drops">Drops</option>
+                      <option value="Ointment">Ointment</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <select id="outOfStockSort" class="form-control">
+                      <option value="lowest_first">Lowest Qty First</option>
+                      <option value="highest_first">Highest Qty First</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3 text-right">
+                    <div class="btn-group">
+                      <button id="exportOosCsv" class="btn btn-default">
+                        <i class="fa fa-file-excel-o"></i> CSV
+                      </button>
+                      <button id="exportOosPdf" class="btn btn-default">
+                        <i class="fa fa-file-pdf-o"></i> PDF
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <hr />
+                <div class="table-responsive">
+                  <table
+                    class="table table-striped table-bordered"
+                    id="outOfStockTable"
+                  >
+                    <thead>
+                      <tr>
+                        <th>Product Name</th>
+                        <th>Strength</th>
+                        <th>Type</th>
+                        <th style="width: 15%">Reorder Quantity</th>
+                        <th style="width: 10%">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="outOfStockTableBody"></tbody>
+                  </table>
+                  <div
+                    id="outOfStockEmptyMessage"
+                    class="text-center p-20"
+                    style="display: none"
+                  >
+                    <h4>No products are currently out of stock.</h4>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-md-12 text-right">
+                    <ul class="pagination m-0" id="outOfStockPagination"></ul>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -970,6 +1056,7 @@
           </div>
         </div>
       </div>
+      <!-- Product Modal Start -->
       <div
         id="newProduct"
         class="modal fade bs-example-modal-lg"
@@ -991,7 +1078,7 @@
               </button>
               <h4 class="modal-title" id="mySmallModalLabel">Product</h4>
             </div>
-            <!-- Product Form -->
+            <!-- Product Form Start -->
             <div class="modal-body">
               <form id="saveProduct" enctype="multipart/form-data">
                 <input type="hidden" name="id" id="product_id" />
@@ -1044,7 +1131,6 @@
                       placeholder="dd/mm/yyyy"
                       class="form-control"
                       id="expirationDate"
-                      readonly
                     />
                   </div>
                 </div>
@@ -1103,12 +1189,6 @@
                 <!-- Row 5 -->
                 <div class="row">
                   <div class="form-group col-md-6">
-                    <label>
-                      <input type="checkbox" name="stock" id="stock" />
-                      Disable stock check
-                    </label>
-                  </div>
-                  <div class="form-group col-md-6">
                     <label for="productGeneric">Generic</label>
                     <input
                       type="text"
@@ -1117,6 +1197,12 @@
                       class="form-control"
                       id="productGeneric"
                     />
+                  </div>
+                  <div class="form-group col-md-6">
+                    <label>
+                      <input type="checkbox" name="stock" id="stock" />
+                      Disable stock check
+                    </label>
                   </div>
                 </div>
 
@@ -1127,11 +1213,13 @@
                 />
               </form>
             </div>
-
-            <!-- Product End -->
+            <!-- Product Form End -->
           </div>
         </div>
       </div>
+      <!-- Product Modal End -->
+
+      <!-- Category Modal Start -->
       <div
         id="newCategory"
         class="modal fade bs-example-modal-sm"
@@ -1177,6 +1265,9 @@
           </div>
         </div>
       </div>
+      <!-- Category Modal End -->
+
+      <!-- Add Product Start -->
       <div
         id="Products"
         class="modal fade bs-example-modal-sm"
@@ -1185,7 +1276,7 @@
         aria-labelledby="mySmallModalLabel"
         aria-hidden="true"
       >
-        <div class="modal-dialog modal-lg">
+        <div clasEnds="modal-dialog modal-lg">
           <div class="modal-content">
             <div class="modal-header">
               <button
@@ -1232,6 +1323,7 @@
           </div>
         </div>
       </div>
+      <!-- Product End -->
       <div
         id="Users"
         class="modal fade bs-example-modal-sm"

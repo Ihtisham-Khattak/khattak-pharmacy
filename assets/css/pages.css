@@ -194,7 +194,6 @@ overflow-y:scroll
 }
 
 
-
 #quit {
   z-index: 9999;
 }
@@ -215,16 +214,24 @@ overflow-y:scroll
 .login-box img{
   max-width: 80%;
   margin-bottom:15px;
-  align-items: center;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 .login-page {
-   height: 100vh;
+    height: 100vh;
     min-height: 100%;
+    margin: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background:radial-gradient(circle, #81c868 0%, #eee 100%);
 }
 #load {
-  /* width: 500px;
-  margin: 300px auto; */
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
   border: 1px solid #ddd;
   font-size: 16px;
   background: #f1f1f1;
