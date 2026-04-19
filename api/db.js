@@ -193,26 +193,6 @@ function initDB() {
     CREATE INDEX IF NOT EXISTS idx_out_of_stock_quantity ON out_of_stock_products(current_quantity);
   `);
 
-  // Migration: Fix broken audit_inventory_update trigger.
-  // The original trigger used NEW.id (product id) as user_id in audit_log,
-  // which violates the FK constraint audit_log.user_id → users(id).
-  // We recreate it using NULL so the FK check is skipped (user is unknown in this context).
-  db.exec(`
-    DROP TRIGGER IF EXISTS audit_inventory_update;
-    CREATE TRIGGER audit_inventory_update
-      AFTER UPDATE ON inventory BEGIN
-        INSERT INTO audit_log (user_id, action, table_name, record_id, old_value, new_value)
-        VALUES (
-          NULL,
-          'INVENTORY_UPDATED',
-          'inventory',
-          NEW.id,
-          json_object('quantity', OLD.quantity, 'price', OLD.price),
-          json_object('quantity', NEW.quantity, 'price', NEW.price)
-        );
-      END;
-  `);
-
   console.log("Database initialized successfully at:", dbPath);
 }
 

@@ -73,18 +73,6 @@ const getFileHash = (filePath) => {
 };
 
 
-const filterFile = (req, file, callback) => {
-    try {
-      const isValidFile = checkFileType(file.mimetype, validFileTypes);
-      if (isValidFile) {
-        return callback(null, true);
-      } else {
-        return callback(new Error(`Invalid file type. Only JPEG, PNG, GIF, and WEBP files are allowed.`), false);
-      }
-    } catch (err) {
-      return callback(new Error(`An error occurred: ${err}`),false);
-    }
-  }
 
 /*Security*/
 

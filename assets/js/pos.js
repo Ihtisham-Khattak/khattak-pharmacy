@@ -30,7 +30,6 @@ let holdOrder = 0;
 let vat = 0;
 let perms = null;
 let deleteId = 0;
-let paymentType = 0;
 let receipt = "";
 let totalVat = 0;
 let subTotal = 0;
@@ -38,7 +37,6 @@ let method = "";
 let order_index = 0;
 let user_index = 0;
 let product_index = 0;
-let transaction_index;
 const appName = process.env.APPNAME;
 const appData = process.env.APPDATA;
 let host = "localhost";
@@ -306,7 +304,6 @@ if (auth == undefined) {
   if (platform != undefined) {
     if (platform.app == "Network Point of Sale Terminal") {
       api = "http://" + platform.ip + ":" + port + "/api/";
-      perms = true;
     }
   }
 
@@ -334,8 +331,6 @@ if (auth == undefined) {
 
     loadCategories();
     loadProducts();
-    // CUSTOMER DROPDOWN - COMMENTED OUT
-    // loadCustomers();
 
     // Pagination Click Handler
     $(document).on("click", ".pagination-btn", function (e) {
@@ -414,13 +409,7 @@ if (auth == undefined) {
         let data = response.data;
         let total = response.total;
 
-        // data.forEach((item) => {
-        //   item.price = parseFloat(item.price).toFixed(2);
-        // });
-
         allProducts = [...data];
-
-        // loadProductList(); // Don't reload list view every time
 
         let delay = 0;
         let expiredCount = 0;
@@ -801,9 +790,7 @@ if (auth == undefined) {
         // Fix #6: Properly initialize payment type with better fallback
         let $activePayment = $(".list-group-item.active");
         let p_type =
-          $activePayment.length > 0
-            ? $activePayment.data("payment-type")
-            : 1;
+          $activePayment.length > 0 ? $activePayment.data("payment-type") : 1;
         if (!p_type || isNaN(p_type)) {
           p_type = 1; // Default to Cash
         }
@@ -1095,7 +1082,8 @@ if (auth == undefined) {
                 // Try to parse response text as JSON
                 try {
                   let response = JSON.parse(xhr.responseText);
-                  errorMessage = response.message || response.error || xhr.responseText;
+                  errorMessage =
+                    response.message || response.error || xhr.responseText;
                 } catch (e) {
                   errorMessage = xhr.responseText.substring(0, 200);
                 }
@@ -1113,11 +1101,7 @@ if (auth == undefined) {
               error: errorThrown,
             });
 
-            notiflix.Report.failure(
-              errorTitle,
-              errorMessage,
-              "Ok",
-            );
+            notiflix.Report.failure(errorTitle, errorMessage, "Ok");
           },
         });
 
@@ -1164,7 +1148,10 @@ if (auth == undefined) {
             if (typeof order.customer === "string") {
               let parsed = JSON.parse(order.customer);
               customerName = parsed.name || "Walk in customer";
-            } else if (typeof order.customer === "object" && order.customer.name) {
+            } else if (
+              typeof order.customer === "object" &&
+              order.customer.name
+            ) {
               customerName = order.customer.name;
             }
           }
@@ -1182,7 +1169,10 @@ if (auth == undefined) {
               $("<div>", { class: "card-box order-box" }).append(
                 $("<p>").append(
                   $("<b>", { text: "Ref :" }),
-                  $("<span>", { text: order.ref_number || "N/A", class: "ref_number" }),
+                  $("<span>", {
+                    text: order.ref_number || "N/A",
+                    class: "ref_number",
+                  }),
                   $("<br>"),
                   $("<b>", { text: "Price :" }),
                   $("<span>", {
@@ -1244,7 +1234,10 @@ if (auth == undefined) {
             if (typeof order.customer === "string") {
               let parsed = JSON.parse(order.customer);
               customerName = parsed.name || "Walk in customer";
-            } else if (typeof order.customer === "object" && order.customer.name) {
+            } else if (
+              typeof order.customer === "object" &&
+              order.customer.name
+            ) {
               customerName = order.customer.name;
             }
           }
@@ -1283,7 +1276,10 @@ if (auth == undefined) {
             if (typeof order.customer === "string") {
               let parsed = JSON.parse(order.customer);
               customerName = parsed.name || "Walk in customer";
-            } else if (typeof order.customer === "object" && order.customer.name) {
+            } else if (
+              typeof order.customer === "object" &&
+              order.customer.name
+            ) {
               customerName = order.customer.name;
             }
           }
@@ -1469,7 +1465,7 @@ if (auth == undefined) {
     $("#outOfStockLink").on("click", function (e) {
       e.preventDefault();
       loadOutOfStock();
-      
+
       $("#pos_view").hide();
       $("#transactions_view").hide();
       $("#transactions").show();
@@ -1496,13 +1492,11 @@ if (auth == undefined) {
 
     $("#saveProduct").submit(function (e) {
       e.preventDefault();
-      console.log("Save Product Form Submitted");
 
       $(this).attr("action", api + "inventory/product");
       $(this).attr("method", "POST");
 
       let data = $(this).serializeObject();
-      console.log("Form Data:", data);
 
       $.ajax({
         url: api + "inventory/product",
@@ -1587,9 +1581,7 @@ if (auth == undefined) {
       $.get(api + "inventory/product/" + id, function (product) {
         $("#category option")
           .filter(function () {
-            return (
-              $(this).val() == product.category_id
-            );
+            return $(this).val() == product.category_id;
           })
           .prop("selected", true);
 
@@ -1743,12 +1735,11 @@ if (auth == undefined) {
       $.get(url, function (response) {
         let users = response.data;
         let total = response.total;
-        allUsers = [...users]; // Update allUsers to current page for editUser to work (it uses index)
+        allUsers = [...users];
 
         let counter = 0;
         let user_list = "";
         $("#user_list").empty();
-        // $("#userList").DataTable().destroy();
 
         users.forEach((user, index) => {
           state = [];
@@ -1760,7 +1751,7 @@ if (auth == undefined) {
             login_time = state[1];
 
             switch (
-              login_status // Fixed variable name from login to login_status
+              login_status
             ) {
               case "Logged In":
                 class_name = "btn-default";
@@ -1805,23 +1796,13 @@ if (auth == undefined) {
       let url = api + "inventory/products?page=" + page + "&limit=" + limit;
       if (query != "") url += "&q=" + query;
 
-      console.log(
-        "Loading Product List Page:",
-        page,
-        "Query:",
-        query,
-        "URL:",
-        url,
-      );
       $.get(url, function (response) {
-        console.log("Product List Response:", response);
         let products = response.data;
         let total = response.total;
 
         let product_list = "";
         let counter = 0;
         $("#product_list").empty();
-        // $("#productList").DataTable().destroy(); // removed datatable
 
         products.forEach((product, index) => {
           counter++;
@@ -1834,7 +1815,6 @@ if (auth == undefined) {
           const todayDate = moment();
           const expiryDate = moment(product.expirationDate, DATE_FORMAT);
 
-          //show stock status indicator
           const stockStatus = getStockStatus(
             product.quantity,
             product.minStock,
@@ -1851,7 +1831,6 @@ if (auth == undefined) {
 
             product.stockAlert = `<p class="text-danger"><small><i class="${icon}"></i> ${product.stockStatus}</small></p>`;
           }
-          //calculate days to expiry
           product.expiryAlert = "";
           if (!isExpired(expiryDate)) {
             const diffDays = daysToExpire(expiryDate);
@@ -1881,28 +1860,7 @@ if (auth == undefined) {
               <td class="nobr"><span class="btn-group"><button onClick="$(this).editProduct(${product.id})" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteProduct(${
                 product.id
               })" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></button></span></td></tr>`;
-
-          // Note: editProduct index might refer to allProducts index in old code?
-          // If we paginate, index 0 is first item on page.
-          // editProduct uses allProducts[index].
-          // We must update editProduct to use products[index] or update allProducts.
-          // Since editProduct logic relies on `allProducts`, we should probably update `allProducts`
-          // OR pass the full product object to editProduct.
-          // Given constraints, I will update allProducts to be the current page products for management?
-          // BUT loadProducts (POS) also sets allProducts. They conflict.
-          // Best to pass ID to editProduct and fetch fresh, OR pass the object directly.
-          // But `editProduct(index)` is called from HTML.
-          // I will hack it: update allProducts? No, POS needs it.
-          // I'll make a temporary `currentListProducts`?
-          // Actually, I can just attach the product object to the button using data attribute!
-          // But `onclick` string is hardcoded.
-          // I will change the onClick to `editProduct(${product._id})` and fetch it?
-          // Or `editProduct` uses `allProducts[index]`.
         });
-
-        // Update allProducts? No, that breaks POS.
-        // I will temporarily shadow allProducts for the list management? No.
-        // I should change editProduct to accept ID and fetch, or look up in `products` array which I'll enable globally as `managementProducts`.
 
         $("#product_list").html(product_list);
         renderPagination(total, limit, page, "loadProductList", "#productList");
@@ -1920,7 +1878,6 @@ if (auth == undefined) {
         let category_list = "";
         let counter = 0;
         $("#category_list").empty();
-        // $("#categoryList").DataTable().destroy();
 
         categories.forEach((category, index) => {
           counter++;
@@ -1981,7 +1938,6 @@ if (auth == undefined) {
       formData["mac"] = mac_address;
       formData["till"] = 1;
 
-      // Update application field in settings form
       let $appField = $("#settings_form input[name='app']");
       let $hiddenAppField = $("<input>", {
         type: "hidden",
@@ -2191,7 +2147,6 @@ if (auth == undefined) {
 
   $("#rmv_logo").on("click", function () {
     $("#remove_logo").val("1");
-    // $("#logo_img").val('');
     $("#current_logo").hide(500);
     $(this).hide(500);
     $("#logoname").show(500);
@@ -2199,7 +2154,6 @@ if (auth == undefined) {
 
   $("#rmv_img").on("click", function () {
     $("#remove_img").val("1");
-    // $("#img").val('');
     $("#current_img").hide(500);
     $(this).hide(500);
     $("#imagename").show(500);
@@ -2611,7 +2565,6 @@ $.fn.viewTransaction = function (index) {
         </div>
       </div>`;
 
-  //prevent DOM XSS; allow windows paths in img src
   receipt = DOMPurify.sanitize(receipt, { ALLOW_UNKNOWN_PROTOCOLS: true });
 
   $("#viewTransaction").html("");
@@ -2645,39 +2598,37 @@ $("#reportrange").on("apply.daterangepicker", function (ev, picker) {
   loadTransactions();
 });
 
-  // --- Out of Stock Module Logic ---
-  
-  function loadOutOfStock(page = 1) {
-    let limit = 10;
-    let query = $("#outOfStockSearch").val() || "";
-    let typeFilter = $("#outOfStockTypeFilter").val() || "";
-    let sort = $("#outOfStockSort").val() || "lowest_first";
-    
-    let url = api + "out-of-stock?page=" + page + "&limit=" + limit;
-    if (query !== "") url += "&q=" + encodeURIComponent(query);
-    if (typeFilter !== "") url += "&type=" + encodeURIComponent(typeFilter);
-    if (sort !== "") url += "&sort=" + encodeURIComponent(sort);
+function loadOutOfStock(page = 1) {
+  let limit = 10;
+  let query = $("#outOfStockSearch").val() || "";
+  let typeFilter = $("#outOfStockTypeFilter").val() || "";
+  let sort = $("#outOfStockSort").val() || "lowest_first";
 
-    $.get(url, function (response) {
-      let data = response.data;
-      let total = response.total;
+  let url = api + "out-of-stock?page=" + page + "&limit=" + limit;
+  if (query !== "") url += "&q=" + encodeURIComponent(query);
+  if (typeFilter !== "") url += "&type=" + encodeURIComponent(typeFilter);
+  if (sort !== "") url += "&sort=" + encodeURIComponent(sort);
 
-      $("#outOfStockTableBody").empty();
-      
-      if (data.length === 0) {
-        $("#outOfStockTable").hide();
-        $("#outOfStockEmptyMessage").show();
-        $("#outOfStockPagination").hide();
-      } else {
-        $("#outOfStockTable").show();
-        $("#outOfStockEmptyMessage").hide();
-        $("#outOfStockPagination").show();
-        
-        data.forEach((item) => {
-          let isCritical = item.current_quantity === 0;
-          let rowClass = isCritical ? "bg-danger" : "";
-          
-          let row = `<tr class="${rowClass}">
+  $.get(url, function (response) {
+    let data = response.data;
+    let total = response.total;
+
+    $("#outOfStockTableBody").empty();
+
+    if (data.length === 0) {
+      $("#outOfStockTable").hide();
+      $("#outOfStockEmptyMessage").show();
+      $("#outOfStockPagination").hide();
+    } else {
+      $("#outOfStockTable").show();
+      $("#outOfStockEmptyMessage").hide();
+      $("#outOfStockPagination").show();
+
+      data.forEach((item) => {
+        let isCritical = item.current_quantity === 0;
+        let rowClass = isCritical ? "bg-danger" : "";
+
+        let row = `<tr class="${rowClass}">
               <td>${item.product_name}</td>
               <td>${item.strength ? item.strength : "N/A"}</td>
               <td>${item.type ? item.type : "N/A"}</td>
@@ -2691,151 +2642,150 @@ $("#reportrange").on("apply.daterangepicker", function (ev, picker) {
                 </button>
               </td>
           </tr>`;
-          $("#outOfStockTableBody").append(row);
-        });
-        
-        // Render custom pagination since renderPagination uses a different target structure sometimes
-        renderOutOfStockPagination(total, limit, page);
-      }
-    }).fail(function() {
-      notiflix.Notify.failure("Failed to fetch Out of Stock products");
-    });
+        $("#outOfStockTableBody").append(row);
+      });
+
+      renderOutOfStockPagination(total, limit, page);
+    }
+  }).fail(function () {
+    notiflix.Notify.failure("Failed to fetch Out of Stock products");
+  });
+}
+
+function renderOutOfStockPagination(total, limit, page) {
+  let pages = Math.ceil(total / limit);
+  let html = "";
+
+  if (pages > 1) {
+    let prev = page - 1;
+    let next = page + 1;
+    let disabledPrev = page == 1 ? "disabled" : "";
+    let disabledNext = page >= pages ? "disabled" : "";
+
+    html += `<li class="${disabledPrev}"><a href="#" class="oos-pagination-btn" data-page="${prev}">Previous</a></li>`;
+    html += `<li class="active"><a href="#">Page ${page} of ${pages}</a></li>`;
+    html += `<li class="${disabledNext}"><a href="#" class="oos-pagination-btn" data-page="${next}">Next</a></li>`;
   }
 
-  function renderOutOfStockPagination(total, limit, page) {
-    let pages = Math.ceil(total / limit);
-    let html = "";
-    
-    if (pages > 1) {
-      let prev = page - 1;
-      let next = page + 1;
-      let disabledPrev = page == 1 ? "disabled" : "";
-      let disabledNext = page >= pages ? "disabled" : "";
+  $("#outOfStockPagination").html(html);
+}
 
-      html += `<li class="${disabledPrev}"><a href="#" class="oos-pagination-btn" data-page="${prev}">Previous</a></li>`;
-      html += `<li class="active"><a href="#">Page ${page} of ${pages}</a></li>`;
-      html += `<li class="${disabledNext}"><a href="#" class="oos-pagination-btn" data-page="${next}">Next</a></li>`;
+$(document).on("click", ".oos-pagination-btn", function (e) {
+  e.preventDefault();
+  if ($(this).parent().hasClass("disabled")) return;
+  let page = $(this).data("page");
+  loadOutOfStock(page);
+});
+
+let oosSearchTimeout;
+$("#outOfStockSearch").on("input", function () {
+  clearTimeout(oosSearchTimeout);
+  oosSearchTimeout = setTimeout(() => {
+    loadOutOfStock(1);
+  }, 300);
+});
+
+$("#outOfStockTypeFilter, #outOfStockSort"). on("change", function () {
+  loadOutOfStock(1);
+});
+
+$("#exportOosCsv, #exportOosPdf").on("click", function (e) {
+  e.preventDefault();
+  let format = $(this).attr("id") === "exportOosCsv" ? "csv" : "pdf";
+  let query = $("#outOfStockSearch").val() || "";
+  let typeFilter = $("#outOfStockTypeFilter").val() || "";
+  let sort = $("#outOfStockSort").val() || "lowest_first";
+
+  let url = api + "out-of-stock?page=1&limit=10000";
+  if (query !== "") url += "&q=" + encodeURIComponent(query);
+  if (typeFilter !== "") url += "&type=" + encodeURIComponent(typeFilter);
+  if (sort !== "") url += "&sort=" + encodeURIComponent(sort);
+
+  let btn = $(this);
+  let originalHtml = btn.html();
+  btn.html('<i class="fa fa-spinner fa-spin"></i>');
+  btn.prop("disabled", true);
+
+  $.get(url, function (response) {
+    btn.html(originalHtml);
+    btn.prop("disabled", false);
+
+    let data = response.data;
+    if (data.length === 0) {
+      notiflix.Notify.warning("No data to export");
+      return;
     }
 
-    $("#outOfStockPagination").html(html);
-  }
-
-  $(document).on("click", ".oos-pagination-btn", function (e) {
-    e.preventDefault();
-    if($(this).parent().hasClass("disabled")) return;
-    let page = $(this).data("page");
-    loadOutOfStock(page);
-  });
-
-  let oosSearchTimeout;
-  $("#outOfStockSearch").on("input", function () {
-    clearTimeout(oosSearchTimeout);
-    oosSearchTimeout = setTimeout(() => {
-      loadOutOfStock(1);
-    }, 300);
-  });
-
-  $("#outOfStockTypeFilter, #outOfStockSort").on("change", function () {
-    loadOutOfStock(1);
-  });
-
-  $("#exportOosCsv, #exportOosPdf").on("click", function (e) {
-    e.preventDefault();
-    let format = $(this).attr("id") === "exportOosCsv" ? "csv" : "pdf";
-    let query = $("#outOfStockSearch").val() || "";
-    let typeFilter = $("#outOfStockTypeFilter").val() || "";
-    let sort = $("#outOfStockSort").val() || "lowest_first";
-    
-    let url = api + "out-of-stock?page=1&limit=10000";
-    if (query !== "") url += "&q=" + encodeURIComponent(query);
-    if (typeFilter !== "") url += "&type=" + encodeURIComponent(typeFilter);
-    if (sort !== "") url += "&sort=" + encodeURIComponent(sort);
-
-    let btn = $(this);
-    let originalHtml = btn.html();
-    btn.html('<i class="fa fa-spinner fa-spin"></i>');
-    btn.prop("disabled", true);
-
-    $.get(url, function (response) {
-      btn.html(originalHtml);
-      btn.prop("disabled", false);
-
-      let data = response.data;
-      if (data.length === 0) {
-        notiflix.Notify.warning("No data to export");
-        return;
-      }
-      
-      let tempTableId = "tempExportTable_" + Date.now();
-      let tempTable = $(`<table id="${tempTableId}">
+    let tempTableId = "tempExportTable_" + Date.now();
+    let tempTable = $(`<table id="${tempTableId}">
         <thead><tr><th>Product Name</th><th>Strength</th><th>Type</th><th>Reorder Quantity</th></tr></thead>
         <tbody></tbody>
       </table>`);
-      
-      data.forEach(item => {
-        tempTable.find("tbody").append(`<tr>
+
+    data.forEach((item) => {
+      tempTable.find("tbody").append(`<tr>
           <td>${item.product_name}</td>
           <td>${item.strength || "N/A"}</td>
           <td>${item.type || "N/A"}</td>
           <td>${item.reorder_quantity || ""}</td>
         </tr>`);
-      });
-      
-      $("body").append(tempTable);
-      tempTable.hide();
-      
-      let dt = tempTable.DataTable({
-        dom: "Bfrtip",
-        buttons: [
-           { extend: "csv", title: "Out_of_Stock_Products" },
-           { extend: "pdf", title: "Out_of_Stock_Products" }
-        ]
-      });
-      
-      if (format === 'csv') {
-        dt.button('.buttons-csv').trigger();
-      } else {
-        dt.button('.buttons-pdf').trigger();
-      }
-      
-      setTimeout(() => {
-        dt.destroy();
-        tempTable.remove();
-      }, 1000);
-    }).fail(function() {
+    });
+
+    $("body").append(tempTable);
+    tempTable.hide();
+
+    let dt = tempTable.DataTable({
+      dom: "Bfrtip",
+      buttons: [
+        { extend: "csv", title: "Out_of_Stock_Products" },
+        { extend: "pdf", title: "Out_of_Stock_Products" },
+      ],
+    });
+
+    if (format === "csv") {
+      dt.button(".buttons-csv").trigger();
+    } else {
+      dt.button(".buttons-pdf").trigger();
+    }
+
+    setTimeout(() => {
+      dt.destroy();
+      tempTable.remove();
+    }, 1000);
+  }).fail(function () {
+    btn.html(originalHtml);
+    btn.prop("disabled", false);
+    notiflix.Notify.failure("Failed to fetch data for export");
+  });
+});
+
+$(document).on("click", ".save-reorder-btn", function () {
+  let id = $(this).data("id");
+  let inputField = $(this).closest("tr").find(".out-of-stock-reorder");
+  let reorderValue = inputField.val();
+
+  let btn = $(this);
+  let originalHtml = btn.html();
+  btn.html('<i class="fa fa-spinner fa-spin"></i>');
+  btn.prop("disabled", true);
+
+  $.ajax({
+    url: api + "out-of-stock/" + id,
+    type: "PUT",
+    data: JSON.stringify({ reorder_quantity: reorderValue }),
+    contentType: "application/json; charset=utf-8",
+    success: function () {
+      notiflix.Notify.success("Reorder quantity saved!");
       btn.html(originalHtml);
       btn.prop("disabled", false);
-      notiflix.Notify.failure("Failed to fetch data for export");
-    });
+    },
+    error: function () {
+      notiflix.Notify.failure("Failed to save reorder quantity.");
+      btn.html(originalHtml);
+      btn.prop("disabled", false);
+    },
   });
-
-  $(document).on("click", ".save-reorder-btn", function() {
-    let id = $(this).data("id");
-    let inputField = $(this).closest("tr").find(".out-of-stock-reorder");
-    let reorderValue = inputField.val();
-    
-    let btn = $(this);
-    let originalHtml = btn.html();
-    btn.html('<i class="fa fa-spinner fa-spin"></i>');
-    btn.prop("disabled", true);
-    
-    $.ajax({
-      url: api + "out-of-stock/" + id,
-      type: "PUT",
-      data: JSON.stringify({ reorder_quantity: reorderValue }),
-      contentType: "application/json; charset=utf-8",
-      success: function() {
-        notiflix.Notify.success("Reorder quantity saved!");
-        btn.html(originalHtml);
-        btn.prop("disabled", false);
-      },
-      error: function() {
-        notiflix.Notify.failure("Failed to save reorder quantity.");
-        btn.html(originalHtml);
-        btn.prop("disabled", false);
-      }
-    });
-  });
+});
 
 function authenticate() {
   $(".loading").hide();
@@ -2866,9 +2816,6 @@ $("body").on("submit", "#account", function (e) {
         } else {
           notiflix.Report.warning("Oops!", auth_error, "Ok");
         }
-      },
-      error: function (data) {
-        console.log(data);
       },
     });
   }
