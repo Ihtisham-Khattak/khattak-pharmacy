@@ -76,7 +76,7 @@ const permissions = [
 
 // Enhanced Notiflix configuration for better UX
 notiflix.Notify.init({
-  position: "right-top",
+  position: window.innerWidth < 768 ? "center-top" : "right-top",
   timeout: 4000,
   cssAnimationDuration: 300,
   messageMaxLength: 200,
