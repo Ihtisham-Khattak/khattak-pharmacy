@@ -75,33 +75,45 @@ const permissions = [
 ];
 
 // Enhanced Notiflix configuration for better UX
-notiflix.Notify.init({
-  position: window.innerWidth < 768 ? "center-top" : "right-top",
-  timeout: 4000,
-  cssAnimationDuration: 300,
-  messageMaxLength: 200,
-  clickToClose: true,
-  closeButton: true,
-  useIcon: true,
-  showOnlyTheLastOne: false,
-  maxNumberOfNotifications: 4,
-  gap: 10,
-  ID: "notiflix-notify",
-  className: "notiflix-notify",
-  zindex: 9999,
-  title: {
-    success: "Success",
-    failure: "Error",
-    warning: "Warning",
-    info: "Info",
-  },
-  message: {
-    success: "Operation completed successfully",
-    failure: "An error occurred",
-    warning: "Please check your input",
-    info: "Here's some information",
-  },
-});
+function initNotiflix() {
+  notiflix.Notify.init({
+    position: window.innerWidth < 768 ? "center-top" : "right-top",
+    timeout: 4000,
+    cssAnimationDuration: 300,
+    messageMaxLength: 200,
+    clickToClose: true,
+    closeButton: true,
+    useIcon: true,
+    showOnlyTheLastOne: false,
+    maxNumberOfNotifications: 4,
+    gap: 10,
+    ID: "notiflix-notify",
+    className: "notiflix-notify",
+    zindex: 9999,
+    title: {
+      success: "Success",
+      failure: "Error",
+      warning: "Warning",
+      info: "Info",
+    },
+    message: {
+      success: "Operation completed successfully",
+      failure: "An error occurred",
+      warning: "Please check your input",
+      info: "Here's some information",
+    },
+  });
+}
+
+initNotiflix();
+
+// Update notification position on resize
+window.addEventListener(
+  "resize",
+  _.debounce(() => {
+    initNotiflix();
+  }, 250),
+);
 
 // Enhanced Report configuration
 notiflix.Report.init({
