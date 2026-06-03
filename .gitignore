@@ -7,3 +7,5 @@ out/
 LICENSE
 coverage
 *.old*
+dist/
+*.log

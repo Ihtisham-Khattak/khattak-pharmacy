@@ -11,8 +11,28 @@
   "main": "start.js",
   "build": {
     "appId": "com.patternsdigital.pharmaspot",
+    "files": [
+    "**/*",
+    "!dist/**/*",
+    "!out/**/*"
+  ],
     "directories": {
-      "buildResources": "assets"
+      "buildResources": "build"
+    },
+    "productName": "PharmaSpot",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   },
   "dependencies": {
@@ -63,7 +83,9 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "test": "jest"
+    "test": "jest",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "browserslist": {
     "production": [
@@ -90,6 +112,7 @@
     "browser-sync": "^3.0.3",
     "cross-env": "^7.0.3",
     "electron": "^37.1.0",
+    "electron-builder": "^26.8.1",
     "electron-is-dev": "^2.0.0",
     "electron-log": "^4.4.8",
     "electron-rebuild": "^3.2.9",
