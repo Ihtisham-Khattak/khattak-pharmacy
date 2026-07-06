@@ -1,4 +1,8 @@
 $(document).ready(function () {
+  function escapeRegex(str) {
+    return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   $("#categories").on("change", function () {
     let selected = $("#categories option:selected").val();
     if (selected == "0") {
@@ -10,13 +14,27 @@ $(document).ready(function () {
   });
 
   function searchProducts() {
-    var matcher = new RegExp($("#search").val(), "gi");
-    $(".box")
-      .show()
-      .not(function () {
-        return matcher.test($(this).find(".name, .sku").text());
-      })
-      .hide();
+    var rawValue = $("#search").val();
+    try {
+      var matcher = new RegExp(escapeRegex(rawValue), "gi");
+      $(".box")
+        .show()
+        .not(function () {
+          try {
+            return matcher.test($(this).find(".name, .sku").text());
+          } catch (innerErr) {
+            return $(this).find(".name, .sku").text().toLowerCase().indexOf(rawValue.toLowerCase()) !== -1;
+          }
+        })
+        .hide();
+    } catch (err) {
+      $(".box")
+        .show()
+        .not(function () {
+          return $(this).find(".name, .sku").text().toLowerCase().indexOf(String(rawValue).toLowerCase()) !== -1;
+        })
+        .hide();
+    }
   }
 
   let $search = $("#search").on("input", function () {
@@ -30,13 +48,27 @@ $(document).ready(function () {
   });
 
   function searchOpenOrders() {
-    var matcher = new RegExp($("#holdOrderInput").val(), "gi");
-    $(".order")
-      .show()
-      .not(function () {
-        return matcher.test($(this).find(".ref_number").text());
-      })
-      .hide();
+    var rawValue = $("#holdOrderInput").val();
+    try {
+      var matcher = new RegExp(escapeRegex(rawValue), "gi");
+      $(".order")
+        .show()
+        .not(function () {
+          try {
+            return matcher.test($(this).find(".ref_number").text());
+          } catch (innerErr) {
+            return $(this).find(".ref_number").text().toLowerCase().indexOf(rawValue.toLowerCase()) !== -1;
+          }
+        })
+        .hide();
+    } catch (err) {
+      $(".order")
+        .show()
+        .not(function () {
+          return $(this).find(".ref_number").text().toLowerCase().indexOf(String(rawValue).toLowerCase()) !== -1;
+        })
+        .hide();
+    }
   }
 
   var $searchHoldOrder = $("#holdOrderInput").on("input", function () {
@@ -50,13 +82,27 @@ $(document).ready(function () {
   });
 
   function searchCustomerOrders() {
-    var matcher = new RegExp($("#holdCustomerOrderInput").val(), "gi");
-    $(".customer-order")
-      .show()
-      .not(function () {
-        return matcher.test($(this).find(".customer_name").text());
-      })
-      .hide();
+    var rawValue = $("#holdCustomerOrderInput").val();
+    try {
+      var matcher = new RegExp(escapeRegex(rawValue), "gi");
+      $(".customer-order")
+        .show()
+        .not(function () {
+          try {
+            return matcher.test($(this).find(".customer_name").text());
+          } catch (innerErr) {
+            return $(this).find(".customer_name").text().toLowerCase().indexOf(rawValue.toLowerCase()) !== -1;
+          }
+        })
+        .hide();
+    } catch (err) {
+      $(".customer-order")
+        .show()
+        .not(function () {
+          return $(this).find(".customer_name").text().toLowerCase().indexOf(String(rawValue).toLowerCase()) !== -1;
+        })
+        .hide();
+    }
   }
 
   $("#holdCustomerOrderInput").on("input", function () {

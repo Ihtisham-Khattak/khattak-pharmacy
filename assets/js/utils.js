@@ -11,7 +11,8 @@ const moneyFormat = (amount, locale = "en-US") => {
 /** Date functions **/
 const isExpired = (dueDate) => {
   let todayDate = moment();
-  return todayDate.isSameOrAfter(dueDate);
+  let expiryDate = moment(dueDate, DATE_FORMAT);
+  return todayDate.isSameOrAfter(expiryDate);
 };
 
 const daysToExpire = (dueDate) => {

@@ -32,8 +32,8 @@ $(document).ready(function () {
   };
 
   $.fn.calculateChange = function () {
-    var payablePrice = ($("#payablePrice").val() || "").replace(",", "");
-    var payment = ($("#payment").val() || "").replace(",", "");
+    var payablePrice = ($("#payablePrice").val() || "").replace(/,/g, "");
+    var payment = ($("#payment").val() || "").replace(/,/g, "");
 
     var price = parseFloat(payablePrice) || 0;
     var paid = parseFloat(payment) || 0;

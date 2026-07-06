@@ -43,7 +43,6 @@ let host = "localhost";
 let port = process.env.PORT;
 let img_path = path.join(appData, appName, "uploads", "/");
 let api = "http://" + host + ":" + port + "/api/";
-const bcrypt = require("bcrypt");
 let categories = [];
 let holdOrderList = [];
 let customerOrderList = [];
@@ -182,6 +181,15 @@ const {
 //set the content security policy of the app
 setContentSecurityPolicy();
 
+// Whitelist-sanitize a stored logo filename before it is ever string-interpolated
+// into an HTML attribute (e.g. src='...'). This must happen BEFORE interpolation,
+// since DOMPurify sanitizing the assembled HTML afterwards is too late to stop an
+// attribute-breakout injection at the point the string is built.
+function safeLogoFilename(name) {
+  if (!name || typeof name !== "string") return "";
+  return name.replace(/[^a-zA-Z0-9._-]/g, "");
+}
+
 $(function () {
   function cb(start, end) {
     $("#reportrange span").html(
@@ -302,6 +310,18 @@ $.fn.serializeObject = function () {
 
 auth = storage.get("auth");
 user = storage.get("user");
+
+let token = storage.get("token");
+if (token) {
+  $.ajaxSetup({ headers: { "X-Access-Token": token } });
+}
+
+$(document).ajaxError(function (event, jqXHR) {
+  if (jqXHR.status === 401) {
+    storage.clear();
+    ipcRenderer.send("app-reload", "");
+  }
+});
 
 $("#main_app").hide();
 if (auth == undefined) {
@@ -477,10 +497,12 @@ if (auth == undefined) {
 
           let item_isExpired = isExpired(item.expirationDate);
           let item_stockStatus = getStockStatus(item.quantity, item.minStock);
+          let safe_item_generic = DOMPurify.sanitize(String(item.generic || ""));
+          let safe_item_name = DOMPurify.sanitize(String(item.name || ""));
 
           let row = `<tr>
-              <td>${item.generic && item.generic !== "undefined" ? item.generic : item.name}</td>
-              <td><span class="${item_isExpired ? "text-danger" : ""}">${item.name}</span> <br><small class="sku">${item.id}</small></td>
+              <td>${item.generic && item.generic !== "undefined" ? safe_item_generic : safe_item_name}</td>
+              <td><span class="${item_isExpired ? "text-danger" : ""}">${safe_item_name}</span> <br><small class="sku">${item.id}</small></td>
               <td>${validator.unescape(settings.symbol) + moneyFormat(item.price)}</td>
               <td>
                   <span class="${item_stockStatus < 1 ? "text-danger" : ""}">${
@@ -694,8 +716,8 @@ if (auth == undefined) {
     };
 
     $.fn.qtDecrement = function (i) {
+      item = cart[i];
       if (item.quantity > 1) {
-        item = cart[i];
         item.quantity = parseInt(item.quantity) - 1;
         $(this).renderTable(cart);
       }
@@ -703,7 +725,26 @@ if (auth == undefined) {
 
     $.fn.qtInput = function (i) {
       item = cart[i];
-      item.quantity = $(this).val();
+      let newQuantity = parseInt($(this).val(), 10);
+
+      if (item.stock == 1) {
+        if (isNaN(newQuantity) || newQuantity < 1) {
+          newQuantity = 1;
+        } else if (newQuantity > item.stock_quantity) {
+          newQuantity = item.stock_quantity;
+          notiflix.Report.info(
+            "No more stock!",
+            "You have already added all the available stock.",
+            "Ok",
+          );
+        }
+      } else {
+        if (isNaN(newQuantity) || newQuantity < 1) {
+          newQuantity = 1;
+        }
+      }
+
+      item.quantity = newQuantity;
       $(this).renderTable(cart);
     };
 
@@ -772,6 +813,7 @@ if (auth == undefined) {
             "There are no items in the cart to process.",
             "Ok",
           );
+          $("#confirmPayment").prop("disabled", false);
           return;
         }
 
@@ -783,6 +825,7 @@ if (auth == undefined) {
             "Application settings are not loaded. Please refresh the page.",
             "Ok",
           );
+          $("#confirmPayment").prop("disabled", false);
           return;
         }
 
@@ -795,6 +838,7 @@ if (auth == undefined) {
               "You need to enter a reference for hold orders!",
               "Ok",
             );
+            $("#confirmPayment").prop("disabled", false);
             return;
           }
         }
@@ -901,7 +945,7 @@ if (auth == undefined) {
         }
 
         let logo = settings.img
-          ? path.join(img_path, validator.unescape(String(settings.img)))
+          ? path.join(img_path, safeLogoFilename(String(settings.img)))
           : "";
 
         receipt = `<div style="font-family: 'Helvetica Neue', sans-serif; font-size: 12px; width: 100%; color: #333;">
@@ -1064,6 +1108,7 @@ if (auth == undefined) {
             $(".loading").hide();
             // Fix #8: Re-enable buttons
             $("#dueModal button").prop("disabled", false);
+            $("#confirmPayment").prop("disabled", false);
             // Clear form fields on success
             $("#refNumber").val("");
             $("#change").text("");
@@ -1082,6 +1127,7 @@ if (auth == undefined) {
             $("#dueModal").modal("hide");
             // Fix #8: Re-enable buttons
             $("#dueModal button").prop("disabled", false);
+            $("#confirmPayment").prop("disabled", false);
 
             // Fix #1: Get actual error message from server response
             let errorMessage = "An unexpected error occurred.";
@@ -1124,6 +1170,7 @@ if (auth == undefined) {
         $(".loading").hide();
         // Fix #8: Re-enable buttons on error
         $("#dueModal button").prop("disabled", false);
+        $("#confirmPayment").prop("disabled", false);
         notiflix.Report.failure(
           "Checkout Error",
           "An unexpected error occurred: " + err.message,
@@ -1444,6 +1491,13 @@ if (auth == undefined) {
       $(this).calculateChange();
     });
     $("#confirmPayment").on("click", function () {
+      // Fix: synchronously lock the button as the very first thing that happens,
+      // before any of submitDueOrder's synchronous receipt-building work runs,
+      // to prevent a fast double-click from queuing two submissions.
+      if ($(this).prop("disabled")) {
+        return;
+      }
+
       if ($("#payment").val() == "") {
         notiflix.Report.warning(
           "Nope!",
@@ -1451,6 +1505,7 @@ if (auth == undefined) {
           "Ok",
         );
       } else {
+        $("#confirmPayment").prop("disabled", true);
         $(this).submitDueOrder(1);
       }
     });
@@ -1776,9 +1831,11 @@ if (auth == undefined) {
           }
 
           counter++;
+          let safe_user_fullname = DOMPurify.sanitize(String(user.fullname || ""));
+          let safe_user_username = DOMPurify.sanitize(String(user.username || ""));
           user_list += `<tr>
-            <td>${user.fullname}</td>
-            <td>${user.username}</td>
+            <td>${safe_user_fullname}</td>
+            <td>${safe_user_username}</td>
             <td class="${class_name}">${
               state.length > 0 ? login_status : ""
             } <br><small> ${state.length > 0 ? login_time : ""}</small></td>
@@ -1859,9 +1916,11 @@ if (auth == undefined) {
             product.expiryAlert = `<p class="text-danger"><small><i class="${icon}"></i> ${product.expiryStatus}</small></p>`;
           }
 
+          let safe_product_generic = DOMPurify.sanitize(String(product.generic || ""));
+          let safe_product_name = DOMPurify.sanitize(String(product.name || ""));
           product_list += `<tr>
-              <td>${product.generic && product.generic !== "undefined" ? product.generic : product.name}</td>
-              <td>${product.name}
+              <td>${product.generic && product.generic !== "undefined" ? safe_product_generic : safe_product_name}</td>
+              <td>${safe_product_name}
               ${product.expiryAlert}</td>
               <td>${validator.unescape(settings.symbol)}${product.price}</td>
               <td>${product.stock == 1 ? product.quantity : "N/A"}
@@ -1928,6 +1987,7 @@ if (auth == undefined) {
           $.get(api + "users/logout/" + user.id, function (data) {
             storage.delete("auth");
             storage.delete("user");
+            storage.delete("token");
             ipcRenderer.send("app-reload", "");
           });
         },
@@ -2023,42 +2083,43 @@ if (auth == undefined) {
       e.preventDefault();
       let formData = $(this).serializeObject();
 
-      if (formData.password != formData.pass) {
-        notiflix.Report.warning("Oops!", "Passwords do not match!", "Ok");
+      // Only enforce the match check when a new password was actually typed.
+      // (An existing-user edit with an empty password field means "leave the
+      // password untouched", which is handled server-side in api/users.js.)
+      if (formData.password) {
+        if (formData.password != formData.pass) {
+          notiflix.Report.warning("Oops!", "Passwords do not match!", "Ok");
+          return;
+        }
       }
 
-      if (
-        bcrypt.compare(formData.password, user.password) ||
-        bcrypt.compare(formData.password, allUsers[user_index].password)
-      ) {
-        $.ajax({
-          url: api + "users/post",
-          type: "POST",
-          data: JSON.stringify(formData),
-          contentType: "application/json; charset=utf-8",
-          cache: false,
-          processData: false,
-          success: function (data) {
-            if (ownUserEdit) {
-              ipcRenderer.send("app-reload", "");
-            } else {
-              $("#userModal").modal("hide");
+      $.ajax({
+        url: api + "users/post",
+        type: "POST",
+        data: JSON.stringify(formData),
+        contentType: "application/json; charset=utf-8",
+        cache: false,
+        processData: false,
+        success: function (data) {
+          if (ownUserEdit) {
+            ipcRenderer.send("app-reload", "");
+          } else {
+            $("#userModal").modal("hide");
 
-              loadUserList();
+            loadUserList();
 
-              $("#Users").modal("show");
-              notiflix.Report.success("Great!", "User details saved!", "Ok");
-            }
-          },
-          error: function (jqXHR, textStatus, errorThrown) {
-            notiflix.Report.failure(
-              jqXHR.responseJSON.error,
-              jqXHR.responseJSON.message,
-              "Ok",
-            );
-          },
-        });
-      }
+            $("#Users").modal("show");
+            notiflix.Report.success("Great!", "User details saved!", "Ok");
+          }
+        },
+        error: function (jqXHR, textStatus, errorThrown) {
+          notiflix.Report.failure(
+            jqXHR.responseJSON.error,
+            jqXHR.responseJSON.message,
+            "Ok",
+          );
+        },
+      });
     });
 
     $("#app").on("change", function () {
@@ -2470,7 +2531,7 @@ $.fn.viewTransaction = function (index) {
             </tr>`;
   }
 
-  logo = path.join(img_path, validator.unescape(settings.img));
+  logo = path.join(img_path, safeLogoFilename(String(settings.img || "")));
 
   receipt = `<div style="font-family: 'Helvetica Neue', sans-serif; font-size: 12px; width: 100%; color: #333;">
         <div style="text-align: center; margin-bottom: 10px;">
@@ -2639,11 +2700,14 @@ function loadOutOfStock(page = 1) {
       data.forEach((item) => {
         let isCritical = item.current_quantity === 0;
         let rowClass = isCritical ? "bg-danger" : "";
+        let safe_product_name = DOMPurify.sanitize(String(item.product_name || ""));
+        let safe_strength = DOMPurify.sanitize(String(item.strength || ""));
+        let safe_type = DOMPurify.sanitize(String(item.type || ""));
 
         let row = `<tr class="${rowClass}">
-              <td>${item.product_name}</td>
-              <td>${item.strength ? item.strength : "N/A"}</td>
-              <td>${item.type ? item.type : "N/A"}</td>
+              <td>${safe_product_name}</td>
+              <td>${item.strength ? safe_strength : "N/A"}</td>
+              <td>${item.type ? safe_type : "N/A"}</td>
               <td>
                 <input type="number" min="0" class="form-control text-center out-of-stock-reorder" 
                   data-id="${item.id}" value="${item.reorder_quantity || ""}" placeholder="Qty">
@@ -2735,10 +2799,13 @@ $("#exportOosCsv, #exportOosPdf").on("click", function (e) {
       </table>`);
 
     data.forEach((item) => {
+      let safe_product_name = DOMPurify.sanitize(String(item.product_name || ""));
+      let safe_strength = DOMPurify.sanitize(String(item.strength || "N/A"));
+      let safe_type = DOMPurify.sanitize(String(item.type || "N/A"));
       tempTable.find("tbody").append(`<tr>
-          <td>${item.product_name}</td>
-          <td>${item.strength || "N/A"}</td>
-          <td>${item.type || "N/A"}</td>
+          <td>${safe_product_name}</td>
+          <td>${safe_strength}</td>
+          <td>${safe_type}</td>
           <td>${item.reorder_quantity || ""}</td>
         </tr>`);
     });
@@ -2822,7 +2889,16 @@ $("body").on("submit", "#account", function (e) {
       success: function (data) {
         if (data.auth === true) {
           storage.set("auth", { auth: true });
-          storage.set("user", data);
+          storage.set("user", data.user);
+          storage.set("token", data.token);
+          $.ajaxSetup({ headers: { "X-Access-Token": data.token } });
+          if (data.user && data.user.must_change_password) {
+            notiflix.Report.warning(
+              "Password Change Required",
+              "Please change your password immediately from your profile/settings.",
+              "Ok",
+            );
+          }
           ipcRenderer.send("app-reload", "");
           $("#login").hide();
         } else {

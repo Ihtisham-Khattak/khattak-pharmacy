@@ -45,8 +45,19 @@ jobs:
           sudo apt-get install -y fakeroot rpm
 
       - name: Publish installers
+        # Code signing: to sign Windows/macOS installers, add a code-signing
+        # certificate to this repository's GitHub Actions secrets:
+        #   - CSC_LINK: the .pfx (Windows) or .p12 (macOS) certificate file,
+        #     base64-encoded
+        #   - CSC_KEY_PASSWORD: the password for that certificate file
+        # electron-builder/electron-forge's signing tooling skips signing
+        # gracefully when CSC_LINK is empty, so until these secrets are
+        # configured, builds remain UNSIGNED and users will see SmartScreen /
+        # Gatekeeper warnings when installing.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           CSC_IDENTITY_AUTO: false
         run: npm run publish
       

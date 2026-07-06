@@ -1,6 +1,7 @@
 const app = require("express")();
 const bodyParser = require("body-parser");
 const { db, ensureForeignKeysEnabled } = require("./db");
+const { requireAuth, requirePermission } = require("./middleware/auth");
 
 app.use(bodyParser.json());
 
@@ -9,6 +10,8 @@ app.use(function (req, res, next) {
   ensureForeignKeysEnabled();
   next();
 });
+
+app.use(requireAuth);
 
 /**
  * GET endpoint: Get details of all out-of-stock products
@@ -63,7 +66,7 @@ app.get("/", function (req, res) {
 /**
  * PUT endpoint: Update reorder quantity
  */
-app.put("/:id", function (req, res) {
+app.put("/:id", requirePermission("perm_products"), function (req, res) {
   let id = parseInt(req.params.id);
   let reorder_quantity = req.body.reorder_quantity ? parseInt(req.body.reorder_quantity) : null;
 
@@ -82,7 +85,7 @@ app.put("/:id", function (req, res) {
 /**
  * POST endpoint: Alternative route to update reorder quantity
  */
-app.post("/reorder", function (req, res) {
+app.post("/reorder", requirePermission("perm_products"), function (req, res) {
   let id = req.body.id ? parseInt(req.body.id) : null;
   let reorder_quantity = req.body.reorder_quantity ? parseInt(req.body.reorder_quantity) : null;
 

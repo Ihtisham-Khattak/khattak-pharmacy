@@ -73,7 +73,7 @@ function checkForUpdates() {
     const message = `Current version: ${pkg.version}\nNew Version: ${info.version}`;
     dialogOpts.message = message;
     dialogOpts.detail =
-      process.platform === "win32" ? releaseNotes : releaseName;
+      process.platform === "win32" ? info.releaseNotes : info.releaseName;
 
     dialog.showMessageBox(dialogOpts).then((returnValue) => {
       if (returnValue.response === 0) {
@@ -111,7 +111,7 @@ const handleError = async (err) => {
       type: "error",
       title: "Update check failed",
       message: "An error occurred while checking for updates.",
-      detail: err,
+      detail: err && (err.message || String(err)),
       buttons: ["Retry", "Cancel"]
     };
 
@@ -221,9 +221,23 @@ const restoreBackup = async (backupZipPath, dbFolderPath, uploadsFolderPath) => 
 
   // Restore directly from backup.zip stream
   await new Promise((resolve, reject) => {
-    backupEntry.stream()
-      .pipe(unzipper.Parse())
+    const parseStream = backupEntry.stream().pipe(unzipper.Parse());
+    let failed = false;
+
+    const fail = (err) => {
+      if (failed) return;
+      failed = true;
+      parseStream.destroy(err);
+      reject(err);
+    };
+
+    parseStream
       .on('entry', entry => {
+        if (failed) {
+          entry.autodrain();
+          return;
+        }
+
         let targetPath;
         if (entry.path.startsWith('databases/')) {
           targetPath = path.join(dbFolderPath, entry.path.replace('databases/', ''));
@@ -239,15 +253,20 @@ const restoreBackup = async (backupZipPath, dbFolderPath, uploadsFolderPath) => 
         const resolvedPath = path.resolve(targetPath);
         if (!resolvedPath.startsWith(path.resolve(allowedBase))) {
           entry.autodrain();
-          throw new Error('Security violation: Attempted directory traversal in backup!');
+          fail(new Error('Security violation: Attempted directory traversal in backup!'));
+          return;
         }
 
         // Ensure parent directory exists
         fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
-        entry.pipe(fs.createWriteStream(resolvedPath));
+        const writeStream = fs.createWriteStream(resolvedPath);
+        writeStream.on('error', fail);
+        entry.pipe(writeStream);
       })
-      .on('close', resolve)
-      .on('error', reject);
+      .on('close', () => {
+        if (!failed) resolve();
+      })
+      .on('error', fail);
   });
 }
 
@@ -299,7 +318,7 @@ const restoreBackupDialog = async (dbFolderPath, uploadsFolderPath) => {
     const confirm = await dialog.showMessageBox({
       type: "warning",
       title: "Confirm Restore",
-      message: "Restoring a backup will overwrite your current database and uploads. Are you sure?",
+      message: "Restoring a backup will overwrite your current database and uploads, and the app will restart to complete the restore. Are you sure?",
       buttons: ["Restore", "Cancel"],
       defaultId: 1,
       cancelId: 1
@@ -307,17 +326,24 @@ const restoreBackupDialog = async (dbFolderPath, uploadsFolderPath) => {
     if (confirm.response !== 0) return;
 
     try {
+      // NOTE: the running server (server.js) holds an open synchronous
+      // better-sqlite3 connection to the database file. Overwriting that
+      // file while the connection is live risks corruption. There is no
+      // exported way to fully stop the server/DB connection from this
+      // module (restartServer() only closes the HTTP listener, not the
+      // sqlite handle), so instead of reloading the window we relaunch the
+      // whole Electron process immediately after the write completes. This
+      // guarantees the old process (and its live sqlite handle) is gone
+      // before a fresh process re-opens the restored database file.
       await restoreBackup(filePaths[0], dbFolderPath, uploadsFolderPath);
-      dialog.showMessageBox({
+      await dialog.showMessageBox({
         type: "info",
         title: "Restore Successful",
-        message: "Backup restored successfully.",
+        message: "Backup restored successfully. The application will now restart to complete the restore.",
         detail: filePaths[0]
       });
-      if (mainWindow) {
-        mainWindow.reload();
-      }
-      restartServer();
+      app.relaunch();
+      app.exit();
     } catch (err) {
       dialog.showErrorBox("Restore Failed", err.message || String(err));
     }

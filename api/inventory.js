@@ -2,6 +2,7 @@ const app = require("express")();
 const bodyParser = require("body-parser");
 const validator = require("validator");
 const { db, ensureForeignKeysEnabled } = require("./db");
+const { requireAuth, requirePermission } = require("./middleware/auth");
 
 app.use(bodyParser.json());
 
@@ -10,6 +11,8 @@ app.use(function (req, res, next) {
   ensureForeignKeysEnabled();
   next();
 });
+
+app.use(requireAuth);
 
 /**
  * Synchronize the out of stock table when product quantities change.
@@ -110,7 +113,7 @@ app.get("/products", function (req, res) {
 /**
  * POST endpoint: Create or update a product.
  */
-app.post("/product", function (req, res) {
+app.post("/product", requirePermission("perm_products"), function (req, res) {
   try {
     let id = req.body.id ? req.body.id.toString() : "";
     let expirationDate = req.body.expirationDate
@@ -134,26 +137,34 @@ app.post("/product", function (req, res) {
     let form = req.body.form ? validator.escape(req.body.form.toString()) : "";
     let stock = req.body.stock === "on" ? 0 : 1;
 
+    if (price < 0 || quantity < 0 || minStock < 0) {
+      return res.status(400).json({
+        error: "Bad Request",
+        message: "price, quantity, and minStock must not be negative",
+      });
+    }
+
     if (id === "") {
-      const newId = Math.floor(Date.now() / 1000);
-      db.prepare(
-        `
-        INSERT INTO inventory (id, name, generic, category_id, price, quantity, minStock, expirationDate, stock, strength, form)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      const result = db
+        .prepare(
+          `
+        INSERT INTO inventory (name, generic, category_id, price, quantity, minStock, expirationDate, stock, strength, form)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      ).run(
-        newId,
-        name,
-        generic,
-        category,
-        price,
-        quantity,
-        minStock,
-        expirationDate,
-        stock,
-        strength,
-        form,
-      );
+        )
+        .run(
+          name,
+          generic,
+          category,
+          price,
+          quantity,
+          minStock,
+          expirationDate,
+          stock,
+          strength,
+          form,
+        );
+      const newId = result.lastInsertRowid;
       syncOutOfStock(db, newId);
       res.sendStatus(200);
     } else {
@@ -191,7 +202,7 @@ app.post("/product", function (req, res) {
 /**
  * DELETE endpoint: Delete a product by product ID.
  */
-app.delete("/product/:productId", function (req, res) {
+app.delete("/product/:productId", requirePermission("perm_products"), function (req, res) {
   try {
     db.prepare("DELETE FROM inventory WHERE id = ?").run(
       parseInt(req.params.productId),
@@ -212,10 +223,10 @@ app.decrementInventory = function (products) {
   ensureForeignKeysEnabled();
 
   const updateStmt = db.prepare(
-    "UPDATE inventory SET quantity = quantity - ? WHERE id = ?",
+    "UPDATE inventory SET quantity = quantity - ? WHERE id = ? AND quantity >= ?",
   );
   const checkStmt = db.prepare(
-    "SELECT id, name, category_id FROM inventory WHERE id = ?"
+    "SELECT id, name, quantity, category_id FROM inventory WHERE id = ?"
   );
   const categoryStmt = db.prepare(
     "SELECT id FROM categories WHERE id = ?"
@@ -240,7 +251,14 @@ app.decrementInventory = function (products) {
         }
       }
 
-      updateStmt.run(productQty, productId);
+      const result = updateStmt.run(productQty, productId, productQty);
+      if (result.changes === 0) {
+        const current = checkStmt.get(productId);
+        const currentQty = current ? current.quantity : 0;
+        throw new Error(
+          `Insufficient stock for product "${invProduct.name}": requested ${productQty} but only ${currentQty} available`,
+        );
+      }
       syncOutOfStock(db, productId);
     }
   });

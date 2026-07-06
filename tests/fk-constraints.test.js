@@ -35,13 +35,24 @@ describe('Foreign Key Constraints - Integration', () => {
   afterAll(() => {
     // Temporarily disable FK for cleanup
     db.pragma("foreign_keys = OFF");
-    
-    // Clean up
-    db.prepare("DELETE FROM inventory WHERE id LIKE ?").run('FK_TEST_%');
+
+    // Clean up. NOTE: inventory rows created in this file use a plain numeric
+    // id (Date.now()-based), never an 'FK_TEST_'-prefixed string id, so
+    // deleting by category_id/name (what these rows actually share) instead
+    // of a never-matching "id LIKE 'FK_TEST_%'" pattern is required for this
+    // to actually remove the rows that reference testCategoryId - otherwise
+    // the categories DELETE below fails its FK check on every run.
+    db.prepare("DELETE FROM inventory WHERE category_id = ? OR name IN (?, ?, ?, ?)").run(
+      testCategoryId,
+      'FK Test Product',
+      'Product Without Category',
+      'Invalid Product',
+      'Zero Category Product',
+    );
     db.prepare("DELETE FROM transactions WHERE id LIKE ?").run('FK_TEST_%');
     db.prepare("DELETE FROM categories WHERE id = ?").run(testCategoryId);
     db.prepare("DELETE FROM users WHERE username = ?").run('fk_test_user');
-    
+
     // Re-enable FK
     db.pragma("foreign_keys = ON");
   });
@@ -162,6 +173,11 @@ describe('Foreign Key Constraints - Integration', () => {
     afterAll(() => {
       // Temporarily disable FK for cleanup
       db.pragma("foreign_keys = OFF");
+      // Transactions referencing this customer must be deleted first - this
+      // inner afterAll runs BEFORE the outer describe's afterAll (which is
+      // where FK_TEST_%-prefixed transactions normally get cleaned up), so
+      // deleting the customer first would fail its own FK check.
+      db.prepare("DELETE FROM transactions WHERE customer_id = ?").run(testCustomerId);
       db.prepare("DELETE FROM customers WHERE id = ?").run(testCustomerId);
       db.pragma("foreign_keys = ON");
     });

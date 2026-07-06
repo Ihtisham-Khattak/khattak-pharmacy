@@ -1,6 +1,7 @@
 const app = require("express")();
 const bodyParser = require("body-parser");
 const { db, ensureForeignKeysEnabled } = require("./db");
+const { requireAuth, requirePermission } = require("./middleware/auth");
 
 app.use(bodyParser.json());
 
@@ -58,53 +59,76 @@ app.get("/category/:categoryId", function (req, res) {
   }
 });
 
+// All routes below this point require authentication.
+app.use(requireAuth);
+
 /**
  * POST endpoint: Create a new category.
  */
-app.post("/category", function (req, res) {
-  try {
-    const id = Math.floor(Date.now() / 1000);
-    db.prepare("INSERT INTO categories (id, name) VALUES (?, ?)").run(
-      id,
-      req.body.name,
-    );
-    res.sendStatus(200);
-  } catch (err) {
-    res
-      .status(500)
-      .json({ error: "Internal Server Error", message: err.message });
-  }
-});
+app.post(
+  "/category",
+  requirePermission("perm_categories"),
+  function (req, res) {
+    try {
+      db.prepare("INSERT INTO categories (name) VALUES (?)").run(
+        req.body.name,
+      );
+      res.sendStatus(200);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: err.message });
+    }
+  },
+);
 
 /**
  * DELETE endpoint: Delete a category by category ID.
  */
-app.delete("/category/:categoryId", function (req, res) {
-  try {
-    db.prepare("DELETE FROM categories WHERE id = ?").run(
-      parseInt(req.params.categoryId),
-    );
-    res.sendStatus(200);
-  } catch (err) {
-    res
-      .status(500)
-      .json({ error: "Internal Server Error", message: err.message });
-  }
-});
+app.delete(
+  "/category/:categoryId",
+  requirePermission("perm_categories"),
+  function (req, res) {
+    try {
+      db.prepare("DELETE FROM categories WHERE id = ?").run(
+        parseInt(req.params.categoryId),
+      );
+      res.sendStatus(200);
+    } catch (err) {
+      if (
+        err.code === "SQLITE_CONSTRAINT_FOREIGNKEY" ||
+        (err.message && err.message.includes("FOREIGN KEY constraint"))
+      ) {
+        return res.status(409).json({
+          error: "Conflict",
+          message:
+            "This category cannot be deleted because it is still assigned to one or more products.",
+        });
+      }
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: err.message });
+    }
+  },
+);
 
 /**
  * PUT endpoint: Update category details.
  */
-app.put("/category", function (req, res) {
-  try {
-    db.prepare("UPDATE categories SET name = ? WHERE id = ?").run(
-      req.body.name,
-      parseInt(req.body.id),
-    );
-    res.sendStatus(200);
-  } catch (err) {
-    res
-      .status(500)
-      .json({ error: "Internal Server Error", message: err.message });
-  }
-});
+app.put(
+  "/category",
+  requirePermission("perm_categories"),
+  function (req, res) {
+    try {
+      db.prepare("UPDATE categories SET name = ? WHERE id = ?").run(
+        req.body.name,
+        parseInt(req.body.id),
+      );
+      res.sendStatus(200);
+    } catch (err) {
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", message: err.message });
+    }
+  },
+);

@@ -9,3 +9,6 @@ coverage
 *.old*
 dist/
 *.log
+data/*.db
+data/*.bak
+*.pre-migration-backup-*.bak

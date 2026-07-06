@@ -6,19 +6,42 @@ const fs = require("fs");
 const path = require("path");
 const validator = require("validator");
 const { db, ensureForeignKeysEnabled } = require("./db");
+const { requireAuth, requirePermission } = require("./middleware/auth");
 
 const appName = process.env.APPNAME || "PharmaSpot";
 const appData = process.env.APPDATA || "";
 
 const maxFileSize = 2097152; // 2MB
 const defaultLogoName = "logo";
-const { filterFile } = require("../assets/js/utils");
+
+/**
+ * Multer fileFilter: only allow image types actually advertised by the
+ * store-logo upload UI (index.html's file input accept=".jpg,.jpeg,.png,.webp").
+ */
+function filterFile(req, file, callback) {
+  const allowedMimeTypes = [
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+  ];
+  const allowedExtensions = [".png", ".jpg", ".jpeg", ".webp"];
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (allowedMimeTypes.includes(file.mimetype) && allowedExtensions.includes(ext)) {
+    callback(null, true);
+  } else {
+    callback(
+      new Error("Only image files (png, jpg, jpeg, webp) are allowed for the store logo."),
+    );
+  }
+}
 
 // Ensure FK is enabled for every request
 app.use(function (req, res, next) {
   ensureForeignKeysEnabled();
   next();
 });
+
+app.use(requireAuth);
 
 const storage = multer.diskStorage({
   destination: path.join(appData, appName, "uploads"),
@@ -72,7 +95,7 @@ app.get("/get", function (req, res) {
 /**
  * POST endpoint: Create or update settings.
  */
-app.post("/post", function (req, res) {
+app.post("/post", requirePermission("perm_settings"), function (req, res) {
   upload(req, res, function (err) {
     if (err) {
       return res

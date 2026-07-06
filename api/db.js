@@ -125,6 +125,7 @@ function initDB() {
       perm_users INTEGER DEFAULT 0,
       perm_settings INTEGER DEFAULT 0,
       status TEXT DEFAULT 'active',
+      must_change_password INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -165,6 +166,7 @@ function initDB() {
       charge_tax INTEGER DEFAULT 0,
       footer TEXT,
       img TEXT,
+      allow_lan_access INTEGER DEFAULT 0,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -193,7 +195,35 @@ function initDB() {
     CREATE INDEX IF NOT EXISTS idx_out_of_stock_quantity ON out_of_stock_products(current_quantity);
   `);
 
+  // Idempotent migrations for columns added after the initial CREATE TABLE
+  // statements above shipped. CREATE TABLE IF NOT EXISTS only applies to
+  // brand-new databases, so existing databases need explicit ALTER TABLE
+  // migrations. SQLite has no "ADD COLUMN IF NOT EXISTS", so we check
+  // PRAGMA table_info() first and only ALTER when the column is missing.
+  addColumnIfMissing("users", "must_change_password", "INTEGER DEFAULT 0");
+  addColumnIfMissing("settings", "allow_lan_access", "INTEGER DEFAULT 0");
+
   console.log("Database initialized successfully at:", dbPath);
+}
+
+/**
+ * Add a column to an existing table if it does not already exist.
+ * Safe to call repeatedly (e.g. on every app startup).
+ */
+function addColumnIfMissing(table, column, definition) {
+  try {
+    const columns = db.pragma(`table_info(${table})`);
+    const exists = columns.some((col) => col.name === column);
+    if (!exists) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      console.log(`Migration: added column ${table}.${column}`);
+    }
+  } catch (err) {
+    console.error(
+      `Migration failed: could not add column ${table}.${column}:`,
+      err.message
+    );
+  }
 }
 
 module.exports = {

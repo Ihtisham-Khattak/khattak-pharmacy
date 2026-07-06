@@ -2,6 +2,7 @@ const app = require("express")();
 const bodyParser = require("body-parser");
 const validator = require("validator");
 const { db, ensureForeignKeysEnabled } = require("./db");
+const { requireAuth } = require("./middleware/auth");
 
 app.use(bodyParser.json());
 
@@ -10,6 +11,11 @@ app.use(function (req, res, next) {
   ensureForeignKeysEnabled();
   next();
 });
+
+// This router has no dedicated perm_* flag in the users schema (unlike
+// products/categories/transactions/users/settings) - any authenticated user
+// may manage customers.
+app.use(requireAuth);
 
 module.exports = app;
 
@@ -89,6 +95,16 @@ app.delete("/customer/:customerId", function (req, res) {
     );
     res.sendStatus(200);
   } catch (err) {
+    if (
+      err.code === "SQLITE_CONSTRAINT_FOREIGNKEY" ||
+      (err.message && err.message.includes("FOREIGN KEY constraint"))
+    ) {
+      return res.status(409).json({
+        error: "Conflict",
+        message:
+          "This customer cannot be deleted because they have existing transaction records.",
+      });
+    }
     res
       .status(500)
       .json({ error: "Internal Server Error", message: err.message });

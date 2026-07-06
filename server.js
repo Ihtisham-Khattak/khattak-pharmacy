@@ -5,10 +5,29 @@ const bodyParser = require("body-parser");
 const rateLimit = require("express-rate-limit");
 const pkg = require("./package.json");
 const { app } = require("electron");
-const { initDB } = require("./api/db");
+const { initDB, db } = require("./api/db");
 
 // Initialize SQLite Database
 initDB();
+
+/**
+ * Determine the host to bind the HTTP server to. Defaults to localhost-only
+ * unless the operator has explicitly opted in to LAN access via the
+ * allow_lan_access setting.
+ */
+function getBindHost() {
+  try {
+    const settingsRow = db
+      .prepare("SELECT allow_lan_access FROM settings WHERE id = 1")
+      .get();
+    if (settingsRow && settingsRow.allow_lan_access) {
+      return undefined;
+    }
+    return "127.0.0.1";
+  } catch (err) {
+    return "127.0.0.1";
+  }
+}
 
 process.env.APPDATA = app.getPath("appData");
 process.env.APPNAME = pkg.name;
@@ -50,9 +69,16 @@ express.use("/api/users", require("./api/users"));
 express.use("/api/out-of-stock", require("./api/outOfStock"));
 express.use("/api", require("./api/transactions"));
 
-server.listen(PORT, () => {
+const bindHost = getBindHost();
+server.listen(PORT, bindHost, () => {
   process.env.PORT = server.address().port;
-  console.log("Listening on PORT", process.env.PORT);
+  console.log(
+    "Listening on PORT",
+    process.env.PORT,
+    "(host:",
+    bindHost || "0.0.0.0 - LAN access enabled",
+    ")",
+  );
 });
 
 /**
