@@ -179,6 +179,8 @@ const {
   setContentSecurityPolicy,
 } = require("./utils");
 const Pagination = require("./pagination");
+const { buildReceipt } = require("./receipt");
+const Alerts = require("./alerts");
 
 let productListPage = 1;
 let productListLimit = 10;
@@ -1072,23 +1074,6 @@ if (auth == undefined) {
           p_type = 1; // Default to Cash
         }
 
-        let items = "";
-        let payment = 0;
-
-        // Fix #3: Add null checks for cart items
-        cart.forEach((item) => {
-          let productName = item.product_name || "Unknown Item";
-          let quantity = item.quantity || 0;
-          let price = item.price || 0;
-          let symbol = settings.symbol || "$";
-
-          items += `<tr><td>${DOMPurify.sanitize(productName)}</td><td>${DOMPurify.sanitize(
-            quantity,
-          )} </td><td class="text-right"> ${DOMPurify.sanitize(validator.unescape(String(symbol)))} ${moneyFormat(
-            DOMPurify.sanitize(Math.abs(price).toFixed(2)),
-          )} </td></tr>`;
-        });
-
         let currentTime = new Date(moment());
         let discount = $("#inputDiscount").val() || 0;
         let customer = 0; // Default to walk-in customer
@@ -1106,7 +1091,6 @@ if (auth == undefined) {
         let refNumber = $("#refNumber").val() || "";
         let orderNumber = holdOrder;
         let type = "";
-        let tax_row = "";
 
         switch (p_type) {
           case 1:
@@ -1117,40 +1101,6 @@ if (auth == undefined) {
             break;
           default:
             type = "Cash";
-        }
-
-        if (paid != "") {
-          let symbol = settings.symbol || "$";
-          payment = `<tr>
-                          <td>Paid</td>
-                          <td>:</td>
-                          <td class="text-right">${validator.unescape(String(symbol))} ${moneyFormat(
-                            Math.abs(paid).toFixed(2),
-                          )}</td>
-                      </tr>
-                      <tr>
-                          <td>Change</td>
-                          <td>:</td>
-                          <td class="text-right">${validator.unescape(String(symbol))} ${moneyFormat(
-                            Math.abs(change).toFixed(2),
-                          )}</td>
-                      </tr>
-                      <tr>
-                          <td>Method</td>
-                          <td>:</td>
-                          <td class="text-right">${type}</td>
-                      </tr>`;
-        }
-
-        if (settings.charge_tax) {
-          let symbol = settings.symbol || "$";
-          tax_row = `<tr>
-                      <td>VAT(${validator.unescape(String(settings.percentage || "0"))})% </td>
-                      <td>:</td>
-                      <td class="text-right">${validator.unescape(String(symbol))} ${moneyFormat(
-                        parseFloat(totalVat || 0).toFixed(2),
-                      )}</td>
-                  </tr>`;
         }
 
         // Fix #8: Show loading state with disabled button
@@ -1169,110 +1119,32 @@ if (auth == undefined) {
           ? path.join(img_path, safeLogoFilename(String(settings.img)))
           : "";
 
-        receipt = `<div style="font-family: 'Helvetica Neue', sans-serif; font-size: 12px; width: 100%; color: #333;">
-          <div style="text-align: center; margin-bottom: 10px;">
-              ${
-                logo && checkFileExists(logo)
-                  ? `<img style='max-width: 80px; margin-bottom: 5px;' src='${logo}' /><br>`
-                  : ``
-              }
-              <h3 style="margin: 0; font-size: 18px; font-weight: bold;">${validator.unescape(String(settings.store || "PharmaSpot"))}</h3>
-              <p style="margin: 2px 0;">${validator.unescape(String(settings.address_one || ""))}</p>
-              <p style="margin: 2px 0;">${validator.unescape(String(settings.address_two || ""))}</p>
-              <p style="margin: 2px 0;">${
-                validator.unescape(String(settings.contact || "")) != ""
-                  ? "Tel: " + validator.unescape(String(settings.contact))
-                  : ""
-              }</p>
-              <p style="margin: 2px 0;">${
-                validator.unescape(String(settings.tax || "")) != ""
-                  ? "Vat No: " + validator.unescape(String(settings.tax))
-                  : ""
-              }</p>
-          </div>
-          
-          <div style="border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 5px 0; margin-bottom: 10px;">
-              <table style="width: 100%; font-size: 11px;">
-                  <tr>
-                      <td><strong>Order:</strong> ${orderNumber}</td>
-                      <td style="text-align: right;"><strong>Date:</strong> ${date}</td>
-                  </tr>
-                  <tr>
-                      <td><strong>Cashier:</strong> ${user.fullname || "User"}</td>
-                      <td style="text-align: right;"><strong>Ref:</strong> ${refNumber == "" ? orderNumber : _.escape(refNumber)}</td>
-                  </tr>
-                  <tr>
-                      <td colspan="2"><strong>Customer:</strong> ${
-                        customer == 0
-                          ? "Walk in customer"
-                          : _.escape(customer.name)
-                      }</td>
-                  </tr>
-              </table>
-          </div>
+        const logoPath = logo && checkFileExists(logo) ? logo : "";
+        const holdCustomerName = ($("#holdCustomerName").val() || "").trim();
+        // subTotal in calculateCart is after discount; add it back for receipt subtotal.
+        const receiptSubtotal =
+          parseFloat(subTotal || 0) + (parseFloat(discount) || 0);
 
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
-              <thead>
-                  <tr style="border-bottom: 1px solid #000;">
-                      <th style="text-align: left; padding: 5px 0;">Item</th>
-                      <th style="text-align: center; padding: 5px 0;">Qty</th>
-                      <th style="text-align: right; padding: 5px 0;">Price</th>
-                  </tr>
-              </thead>
-              <tbody>
-                  ${items}
-              </tbody>
-          </table>
-
-          <div style="border-top: 1px solid #000; padding-top: 5px;">
-              <table style="width: 100%; font-size: 12px;">
-                  <tr>
-                      <td style="padding-top: 5px;">Subtotal:</td>
-                      <td style="text-align: right; padding-top: 5px;">${validator.unescape(String(settings.symbol || "$"))}${moneyFormat((subTotal || 0).toFixed(2))}</td>
-                  </tr>
-                  ${
-                    discount > 0
-                      ? `<tr>
-                          <td>Discount:</td>
-                          <td style="text-align: right;">${validator.unescape(String(settings.symbol || "$")) + moneyFormat(parseFloat(discount).toFixed(2))}</td>
-                         </tr>`
-                      : ""
-                  }
-                  ${tax_row ? tax_row.replace(/<tr>/g, '<tr style="font-size: 11px; color: #666;">') : ""}
-                  <tr style="font-weight: bold; font-size: 14px;">
-                      <td style="padding-top: 5px; border-top: 1px dashed #ccc;">Total:</td>
-                      <td style="text-align: right; padding-top: 5px; border-top: 1px dashed #ccc;">${validator.unescape(String(settings.symbol || "$"))}${moneyFormat(parseFloat(orderTotal || 0).toFixed(2))}</td>
-                  </tr>
-                   ${
-                     payment != 0
-                       ? `<tr>
-                          <td style="padding-top: 5px;">Paid:</td>
-                          <td style="text-align: right; padding-top: 5px;">${payment
-                            .replace(/<td class="text-right">/g, "")
-                            .replace(/<\/td>/g, "")
-                            .replace(/<td>/g, "")
-                            .replace(/<b>/g, "")
-                            .replace(/<\/b>/g, "")}</td> 
-                         </tr>`
-                       : ""
-                   }
-                   ${
-                     change > 0
-                       ? `<tr>
-                          <td>Change:</td>
-                          <td style="text-align: right;">${validator.unescape(String(settings.symbol || "$"))}${moneyFormat(parseFloat(change).toFixed(2))}</td>
-                         </tr>`
-                       : ""
-                   }
-              </table>
-          </div>
-
-          <div style="text-align: center; margin-top: 15px; font-size: 11px; color: #666;">
-              <p>${validator.unescape(String(settings.footer || "Thank you!"))}</p>
-              <p>Thank you for purchasing!</p>
-              <p>For inquiries, contact: ${validator.unescape(String(settings.contact || ""))}</p>
-          </div>
-        </div>`;
+        receipt = buildReceipt({
+          settings,
+          logoPath,
+          orderNumber,
+          date: moment(currentTime).format("DD MMM YYYY HH:mm"),
+          cashier: user.fullname || "Cashier",
+          refNumber: refNumber || orderNumber,
+          customerName:
+            holdCustomerName ||
+            (customer == 0 ? "Walk-in Customer" : customer.name),
+          items: cart,
+          subtotal: receiptSubtotal,
+          discount,
+          taxAmount: totalVat || 0,
+          total: orderTotal || 0,
+          paid: status == 0 ? "" : paid,
+          change: status == 0 ? 0 : change,
+          paymentMethod: type,
+          statusLabel: status == 0 ? "HOLD ORDER" : "",
+        });
 
         if (status == 3) {
           if (cart.length > 0) {
@@ -2698,182 +2570,51 @@ function tillFilter(tills) {
 
 $.fn.viewTransaction = function (index) {
   transaction_index = index;
+  const txn = allTransactions[index];
+  if (!txn) return;
 
-  let discount = allTransactions[index].discount;
-  let customer =
-    allTransactions[index].customer == 0
-      ? "Walk in Customer"
-      : allTransactions[index].customer.username;
-  let refNumber =
-    allTransactions[index].ref_number != ""
-      ? allTransactions[index].ref_number
-      : allTransactions[index].id;
-  let orderNumber = allTransactions[index].id;
-  let paymentMethod = "";
-  let tax_row = "";
-  let items = "";
-  let products = allTransactions[index].items;
+  const discount = parseFloat(txn.discount) || 0;
+  const taxAmount = parseFloat(txn.tax) || 0;
+  const total = parseFloat(txn.total) || 0;
+  const subtotal = total - taxAmount + discount;
+  const products = Array.isArray(txn.items) ? txn.items : [];
+  const refNumber =
+    txn.ref_number && String(txn.ref_number).trim() !== ""
+      ? txn.ref_number
+      : txn.id;
+  const customerName =
+    txn.hold_customer_name ||
+    (txn.customer && txn.customer.name) ||
+    "Walk-in Customer";
+  const cashierUser = allUsers.find((u) => u.id == txn.user_id);
+  const logo = path.join(img_path, safeLogoFilename(String(settings.img || "")));
+  const logoPath = checkFileExists(logo) ? logo : "";
+  const isVoided = txn.status === -1 || txn.status === "-1";
 
-  products.forEach((item) => {
-    items += `<tr><td>${item.product_name}</td><td>${
-      item.quantity
-    } </td><td class="text-right"> ${validator.unescape(settings.symbol)} ${moneyFormat(
-      Math.abs(item.price).toFixed(2),
-    )} </td></tr>`;
+  receipt = buildReceipt({
+    settings,
+    logoPath,
+    orderNumber: txn.id,
+    date: moment(txn.date).format("DD MMM YYYY HH:mm"),
+    cashier: (cashierUser && cashierUser.fullname) || txn.user || "Cashier",
+    refNumber,
+    customerName,
+    items: products,
+    subtotal,
+    discount,
+    taxAmount,
+    total,
+    paid: txn.paid,
+    change: txn.change,
+    paymentMethod: txn.payment_type || "Cash",
+    statusLabel: isVoided ? "VOIDED" : txn.status === 0 ? "HOLD / UNPAID" : "",
   });
-
-  paymentMethod = allTransactions[index].payment_type || "Cash";
-
-  if (allTransactions[index].paid != "") {
-    payment = `<tr>
-                    <td>Paid</td>
-                    <td>:</td>
-                    <td class="text-right">${validator.unescape(settings.symbol)} ${moneyFormat(
-                      Math.abs(allTransactions[index].paid).toFixed(2),
-                    )}</td>
-                </tr>
-                <tr>
-                    <td>Change</td>
-                    <td>:</td>
-                    <td class="text-right">${validator.unescape(settings.symbol)} ${moneyFormat(
-                      Math.abs(allTransactions[index].change).toFixed(2),
-                    )}</td>
-                </tr>
-                <tr>
-                    <td>Method</td>
-                    <td>:</td>
-                    <td class="text-right">${paymentMethod}</td>
-                </tr>`;
-  }
-
-  if (settings.charge_tax) {
-    tax_row = `<tr>
-                <td>Vat(${validator.unescape(settings.percentage)})% </td>
-                <td>:</td>
-                <td class="text-right">${validator.unescape(settings.symbol)}${parseFloat(
-                  allTransactions[index].tax,
-                ).toFixed(2)}</td>
-            </tr>`;
-  }
-
-  logo = path.join(img_path, safeLogoFilename(String(settings.img || "")));
-
-  receipt = `<div style="font-family: 'Helvetica Neue', sans-serif; font-size: 12px; width: 100%; color: #333;">
-        <div style="text-align: center; margin-bottom: 10px;">
-            ${
-              checkFileExists(logo)
-                ? `<img style='max-width: 80px; margin-bottom: 5px;' src='${logo}' /><br>`
-                : ``
-            }
-            <h3 style="margin: 0; font-size: 18px; font-weight: bold;">${validator.unescape(settings.store)}</h3>
-            <p style="margin: 2px 0;">${validator.unescape(settings.address_one)}</p>
-            <p style="margin: 2px 0;">${validator.unescape(settings.address_two)}</p>
-            <p style="margin: 2px 0;">${
-              validator.unescape(settings.contact) != ""
-                ? "Tel: " + validator.unescape(settings.contact)
-                : ""
-            }</p>
-            <p style="margin: 2px 0;">${
-              validator.unescape(settings.tax) != ""
-                ? "Vat No: " + validator.unescape(settings.tax)
-                : ""
-            }</p>
-        </div>
-
-        <div style="border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 5px 0; margin-bottom: 10px;">
-            <table style="width: 100%; font-size: 11px;">
-                <tr>
-                    <td><strong>Order:</strong> ${orderNumber}</td>
-                    <td style="text-align: right;"><strong>Date:</strong> ${moment(allTransactions[index].date).format("DD MMM YYYY HH:mm")}</td>
-                </tr>
-                <tr>
-                    <td><strong>Cashier:</strong> ${allTransactions[index].user}</td>
-                    <td style="text-align: right;"><strong>Ref:</strong> ${refNumber}</td>
-                </tr>
-                <tr>
-                    <td colspan="2"><strong>Customer:</strong> ${
-                      allTransactions[index].customer == 0
-                        ? "Walk in Customer"
-                        : allTransactions[index].customer.name
-                    }</td>
-                </tr>
-            </table>
-        </div>
-
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
-            <thead>
-                <tr style="border-bottom: 1px solid #000;">
-                    <th style="text-align: left; padding: 5px 0;">Item</th>
-                    <th style="text-align: center; padding: 5px 0;">Qty</th>
-                    <th style="text-align: right; padding: 5px 0;">Price</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${items}
-            </tbody>
-        </table>
-
-        <div style="border-top: 1px solid #000; padding-top: 5px;">
-             <table style="width: 100%; font-size: 12px;">
-                <tr>
-                    <td style="padding-top: 5px;">Subtotal:</td>
-                    <td style="text-align: right; padding-top: 5px;">${validator.unescape(settings.symbol)}${moneyFormat(allTransactions[index].subtotal)}</td>
-                </tr>
-                ${
-                  discount > 0
-                    ? `<tr>
-                        <td>Discount:</td>
-                        <td style="text-align: right;">${validator.unescape(settings.symbol) + moneyFormat(parseFloat(allTransactions[index].discount).toFixed(2))}</td>
-                       </tr>`
-                    : ""
-                }
-                ${tax_row ? tax_row.replace(/<tr>/g, '<tr style="font-size: 11px; color: #666;">') : ""}
-                <tr style="font-weight: bold; font-size: 14px;">
-                    <td style="padding-top: 5px; border-top: 1px dashed #ccc;">Total:</td>
-                    <td style="text-align: right; padding-top: 5px; border-top: 1px dashed #ccc;">${validator.unescape(settings.symbol)}${moneyFormat(allTransactions[index].total)}</td>
-                </tr>
-                 ${
-                   payment != 0
-                     ? `<tr>
-                        <td style="padding-top: 5px;">Paid:</td>
-                         <td style="text-align: right; padding-top: 5px;">${payment
-                           .replace(/<td class="text-right">/g, "")
-                           .replace(/<\/td>/g, "")
-                           .replace(/<td>/g, "")
-                           .replace(/<b>/g, "")
-                           .replace(/<\/b>/g, "")}</td> 
-                       </tr>`
-                     : ""
-                 }
-                 ${
-                   allTransactions[index].change > 0
-                     ? `<tr>
-                        <td>Change:</td>
-                        <td style="text-align: right;">${validator.unescape(settings.symbol)}${moneyFormat(parseFloat(allTransactions[index].change).toFixed(2))}</td>
-                       </tr>`
-                     : ""
-                 }
-            </table>
-        </div>
-
-        <div style="text-align: center; margin-top: 15px; font-size: 11px; color: #666;">
-            <p>${validator.unescape(settings.footer)}</p>
-            <p>Thank you for purchasing!</p>
-            <p>For inquiries, contact: ${validator.unescape(settings.contact)}</p>
-        </div>
-      </div>`;
-
-  receipt = DOMPurify.sanitize(receipt, { ALLOW_UNKNOWN_PROTOCOLS: true });
 
   $("#viewTransaction").html("");
   $("#viewTransaction").html(receipt);
 
   const canVoid =
-    user &&
-    user.perm_transactions === 1 &&
-    allTransactions[index] &&
-    allTransactions[index].status !== -1 &&
-    allTransactions[index].status !== "-1";
+    user && user.perm_transactions === 1 && txn && !isVoided;
   if (canVoid) {
     $("#voidTransactionBtn").show();
   } else {

@@ -60,8 +60,125 @@
   margin: 0;
 }
 
-#cartTable .cart-item-name {
-  word-break: break-word;
+.modal-receipt .modal-dialog {
+  width: 360px;
+  max-width: 92vw;
+}
+
+.modal-receipt .modal-body {
+  background: #f7f7f7;
+  padding: 16px;
+}
+
+.ps-receipt {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #111;
+  width: 100%;
+  max-width: 302px;
+  margin: 0 auto;
+  background: #fff;
+  padding: 14px 12px 18px;
+  box-sizing: border-box;
+}
+
+.ps-receipt-brand {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.ps-receipt-logo {
+  max-width: 72px;
+  max-height: 72px;
+  margin: 0 auto 6px;
+  display: block;
+}
+
+.ps-receipt-store {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 4px;
+}
+
+.ps-receipt-status {
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 8px 0;
+  padding: 4px 0;
+  border: 1px solid #111;
+}
+
+.ps-receipt-rule {
+  border-top: 1px dashed #333;
+  margin: 8px 0;
+}
+
+.ps-receipt-meta,
+.ps-receipt-items,
+.ps-receipt-totals {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ps-receipt-meta td,
+.ps-receipt-totals td {
+  padding: 2px 0;
+  vertical-align: top;
+}
+
+.ps-receipt-num {
+  text-align: right;
+}
+
+.ps-receipt-items th {
+  font-size: 11px;
+  border-bottom: 1px solid #111;
+  padding: 0 0 4px;
+}
+
+.ps-receipt-total-row td {
+  font-size: 14px;
+  font-weight: 700;
+  padding-top: 6px;
+  border-top: 1px dashed #333;
+}
+
+.ps-receipt-footer {
+  text-align: center;
+  font-size: 11px;
+  color: #333;
+  margin-top: 10px;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .modal-receipt,
+  .modal-receipt * {
+    visibility: visible;
+  }
+  .modal-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+  }
+  .modal-receipt .modal-header,
+  .modal-receipt .alert {
+    display: none !important;
+  }
+  .ps-receipt {
+    max-width: 80mm;
+    width: 80mm;
+    padding: 0;
+  }
 }
 
 @media (min-width: 768px) {
