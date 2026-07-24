@@ -2738,9 +2738,11 @@ function loadOutOfStock(page = 1) {
               <td>${safe_product_name}</td>
               <td>${item.strength ? safe_strength : "N/A"}</td>
               <td>${item.type ? safe_type : "N/A"}</td>
+              <td>${item.current_quantity != null ? item.current_quantity : 0}</td>
+              <td>${item.minimum_quantity != null ? item.minimum_quantity : 0}</td>
               <td>
                 <input type="number" min="0" class="form-control text-center out-of-stock-reorder" 
-                  data-id="${item.id}" value="${item.reorder_quantity || ""}" placeholder="Qty">
+                  data-id="${item.id}" value="${item.reorder_quantity != null ? item.reorder_quantity : ""}" placeholder="Qty">
               </td>
               <td>
                 <button class="btn btn-primary btn-sm save-reorder-btn" data-id="${item.id}">
@@ -2751,37 +2753,22 @@ function loadOutOfStock(page = 1) {
         $("#outOfStockTableBody").append(row);
       });
 
-      renderOutOfStockPagination(total, limit, page);
+      Pagination.render({
+        total,
+        page,
+        limit,
+        mount: "#outOfStockPagination",
+        namespace: "oos",
+        showPageSize: false,
+        onPageChange: function (nextPage) {
+          loadOutOfStock(nextPage);
+        },
+      });
     }
   }).fail(function () {
     notiflix.Notify.failure("Failed to fetch Out of Stock products");
   });
 }
-
-function renderOutOfStockPagination(total, limit, page) {
-  let pages = Math.ceil(total / limit);
-  let html = "";
-
-  if (pages > 1) {
-    let prev = page - 1;
-    let next = page + 1;
-    let disabledPrev = page == 1 ? "disabled" : "";
-    let disabledNext = page >= pages ? "disabled" : "";
-
-    html += `<li class="${disabledPrev}"><a href="#" class="oos-pagination-btn" data-page="${prev}">Previous</a></li>`;
-    html += `<li class="active"><a href="#">Page ${page} of ${pages}</a></li>`;
-    html += `<li class="${disabledNext}"><a href="#" class="oos-pagination-btn" data-page="${next}">Next</a></li>`;
-  }
-
-  $("#outOfStockPagination").html(html);
-}
-
-$(document).on("click", ".oos-pagination-btn", function (e) {
-  e.preventDefault();
-  if ($(this).parent().hasClass("disabled")) return;
-  let page = $(this).data("page");
-  loadOutOfStock(page);
-});
 
 let oosSearchTimeout;
 $("#outOfStockSearch").on("input", function () {
@@ -2791,7 +2778,7 @@ $("#outOfStockSearch").on("input", function () {
   }, 300);
 });
 
-$("#outOfStockTypeFilter, #outOfStockSort"). on("change", function () {
+$("#outOfStockTypeFilter, #outOfStockSort").on("change", function () {
   loadOutOfStock(1);
 });
 

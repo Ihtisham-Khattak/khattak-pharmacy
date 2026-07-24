@@ -68,14 +68,37 @@ app.get("/", function (req, res) {
  */
 app.put("/:id", requirePermission("perm_products"), function (req, res) {
   let id = parseInt(req.params.id);
-  let reorder_quantity = req.body.reorder_quantity ? parseInt(req.body.reorder_quantity) : null;
+  let reorder_quantity = null;
+  if (
+    req.body.reorder_quantity !== undefined &&
+    req.body.reorder_quantity !== null &&
+    req.body.reorder_quantity !== ""
+  ) {
+    reorder_quantity = parseInt(req.body.reorder_quantity, 10);
+    if (isNaN(reorder_quantity) || reorder_quantity < 0) {
+      return res.status(400).json({
+        error: "Invalid Quantity",
+        message: "Reorder quantity must be a non-negative number.",
+      });
+    }
+  }
 
   try {
-    db.prepare(`
+    const result = db
+      .prepare(
+        `
       UPDATE out_of_stock_products
       SET reorder_quantity = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(reorder_quantity, id);
+    `,
+      )
+      .run(reorder_quantity, id);
+    if (result.changes === 0) {
+      return res.status(404).json({
+        error: "Not Found",
+        message: "Out of stock record not found.",
+      });
+    }
     res.sendStatus(200);
   } catch (err) {
     res.status(500).send({ error: "Internal Server Error", message: err.message });
@@ -87,18 +110,41 @@ app.put("/:id", requirePermission("perm_products"), function (req, res) {
  */
 app.post("/reorder", requirePermission("perm_products"), function (req, res) {
   let id = req.body.id ? parseInt(req.body.id) : null;
-  let reorder_quantity = req.body.reorder_quantity ? parseInt(req.body.reorder_quantity) : null;
+  let reorder_quantity = null;
+  if (
+    req.body.reorder_quantity !== undefined &&
+    req.body.reorder_quantity !== null &&
+    req.body.reorder_quantity !== ""
+  ) {
+    reorder_quantity = parseInt(req.body.reorder_quantity, 10);
+    if (isNaN(reorder_quantity) || reorder_quantity < 0) {
+      return res.status(400).json({
+        error: "Invalid Quantity",
+        message: "Reorder quantity must be a non-negative number.",
+      });
+    }
+  }
 
   if (!id) {
     return res.status(400).send({ error: "Bad Request", message: "ID is required" });
   }
 
   try {
-    db.prepare(`
+    const result = db
+      .prepare(
+        `
       UPDATE out_of_stock_products
       SET reorder_quantity = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(reorder_quantity, id);
+    `,
+      )
+      .run(reorder_quantity, id);
+    if (result.changes === 0) {
+      return res.status(404).json({
+        error: "Not Found",
+        message: "Out of stock record not found.",
+      });
+    }
     res.sendStatus(200);
   } catch (err) {
     res.status(500).send({ error: "Internal Server Error", message: err.message });

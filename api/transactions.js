@@ -141,6 +141,9 @@ function voidTransactionById(id) {
             `Cannot restore stock for missing product ID ${productId}`,
           );
         }
+        if (typeof Inventory.syncOutOfStock === "function") {
+          Inventory.syncOutOfStock(db, productId);
+        }
       }
     }
     voidStmt.run(id);

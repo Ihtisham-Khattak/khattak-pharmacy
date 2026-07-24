@@ -48,6 +48,8 @@ function syncOutOfStock(db, productId) {
   }
 }
 
+app.syncOutOfStock = syncOutOfStock;
+
 module.exports = app;
 
 /**
