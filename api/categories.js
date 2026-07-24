@@ -30,14 +30,21 @@ app.get("/all", function (req, res) {
   let limit = parseInt(req.query.limit) || 10;
   let page = parseInt(req.query.page) || 1;
   let skip = (page - 1) * limit;
+  let query = "SELECT * FROM categories";
+  let countQuery = "SELECT COUNT(*) as count FROM categories";
+  let params = [];
+
+  if (req.query.q !== undefined && req.query.q !== "") {
+    const searchTerm = `%${req.query.q}%`;
+    query += " WHERE name LIKE ?";
+    countQuery += " WHERE name LIKE ?";
+    params.push(searchTerm);
+  }
 
   try {
-    const count = db
-      .prepare("SELECT COUNT(*) as count FROM categories")
-      .get().count;
-    const categories = db
-      .prepare("SELECT * FROM categories LIMIT ? OFFSET ?")
-      .all(limit, skip);
+    const count = db.prepare(countQuery).get(...params).count;
+    query += " ORDER BY name ASC LIMIT ? OFFSET ?";
+    const categories = db.prepare(query).all(...params, limit, skip);
     res.send({ data: categories, total: count });
   } catch (err) {
     res.status(500).send(err.message);

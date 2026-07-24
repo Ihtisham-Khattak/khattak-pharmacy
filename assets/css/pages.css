@@ -3,6 +3,58 @@
   display: none;
 }
 
+#products_view,
+#categories_view {
+  display: none;
+}
+
+.ps-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 8px;
+}
+
+.ps-pagination-meta {
+  font-size: 12px;
+}
+
+.ps-pagination-size label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: normal;
+  font-size: 12px;
+  margin: 0;
+}
+
+.ps-pagination-size .form-control {
+  display: inline-block;
+  width: auto;
+  min-width: 70px;
+}
+
+.mgmt-toolbar {
+  margin-bottom: 16px;
+}
+
+.mgmt-toolbar .form-control {
+  margin-bottom: 8px;
+}
+
+.mgmt-table-wrap {
+  overflow-x: auto;
+}
+
+@media (min-width: 768px) {
+  .mgmt-toolbar .form-control {
+    margin-bottom: 0;
+  }
+}
+
 #card-box tr {display: block; }
 #card-box th, #card-box td:first-child{ width: 10px; }
 #card-box th, #card-box td:nth-child(2){ width: 150px; }

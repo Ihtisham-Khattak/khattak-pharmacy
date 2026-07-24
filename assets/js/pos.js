@@ -177,6 +177,40 @@ const {
   checkFileExists,
   setContentSecurityPolicy,
 } = require("./utils");
+const Pagination = require("./pagination");
+
+let productListPage = 1;
+let productListLimit = 10;
+let categoryListPage = 1;
+let categoryListLimit = 10;
+
+function showAppView(viewId) {
+  $(
+    "#pos_view, #transactions_view, #out_of_stock_view, #products_view, #categories_view",
+  ).hide();
+  $("#pointofsale").show();
+  $("#transactions").show();
+  if (viewId === "#pos_view") {
+    $("#pointofsale").hide();
+  }
+  if (viewId === "#transactions_view") {
+    $("#transactions").hide();
+  }
+  $(viewId).show();
+}
+
+function populateProductCategoryFilter() {
+  const $filter = $("#productCategoryFilter");
+  if (!$filter.length) return;
+  const current = $filter.val() || "";
+  let options = `<option value="">All Categories</option>`;
+  (allCategories || []).forEach((cat) => {
+    const name = DOMPurify.sanitize(String(cat.name || ""));
+    options += `<option value="${cat.id}">${name}</option>`;
+  });
+  $filter.html(options);
+  $filter.val(current);
+}
 
 //set the content security policy of the app
 setContentSecurityPolicy();
@@ -235,26 +269,14 @@ $(function () {
   cb(start, end);
 
   window.renderPagination = function (total, limit, page, type, container) {
-    let pages = Math.ceil(total / limit);
-    let html =
-      '<div class="row"><div class="col-md-12"><div class="text-center"><ul class="pagination pagination-sm">';
-    let prev = page - 1;
-    let next = page + 1;
-    let disabledPrev = page == 1 ? "disabled" : "";
-    let disabledNext = page >= pages ? "disabled" : "";
-
-    if (pages > 1) {
-      html += `<li class="${disabledPrev}"><a href="#" class="pagination-btn" data-func="${type}" data-page="${prev}">Previous</a></li>`;
-      html += `<li class="active"><a href="#">Page ${page} of ${pages}</a></li>`;
-      html += `<li class="${disabledNext}"><a href="#" class="pagination-btn" data-func="${type}" data-page="${next}">Next</a></li>`;
-    }
-
-    html += "</ul></div></div></div>";
-
-    $(container).parent().find(".pagination-container").remove();
-    $(container)
-      .parent()
-      .append(`<div class="pagination-container">${html}</div>`);
+    Pagination.renderLegacy(
+      total,
+      limit,
+      page,
+      type,
+      container,
+      window.__paginationHandlers || {},
+    );
   };
 
   $("#expirationDate").daterangepicker({
@@ -364,16 +386,20 @@ if (auth == undefined) {
     loadCategories();
     loadProducts();
 
-    // Pagination Click Handler
-    $(document).on("click", ".pagination-btn", function (e) {
-      e.preventDefault();
-      let func = $(this).data("func");
-      let page = $(this).data("page");
-      if (func === "loadProducts") loadProducts(page);
-      else if (func === "loadProductList") loadProductList(page);
-      else if (func === "loadCategoryList") loadCategoryList(page);
-      else if (func === "loadUserList") loadUserList(page);
-    });
+    window.__paginationHandlers = {
+      loadProducts: function (p) {
+        loadProducts(p);
+      },
+      loadProductList: function (p) {
+        loadProductList(p);
+      },
+      loadCategoryList: function (p) {
+        loadCategoryList(p);
+      },
+      loadUserList: function (p) {
+        loadUserList(p);
+      },
+    };
 
     // Search Handler
     let searchTimeout;
@@ -389,8 +415,33 @@ if (auth == undefined) {
       clearTimeout(searchTimeout);
       let query = $(this).val();
       searchTimeout = setTimeout(() => {
+        productListPage = 1;
         loadProductList(1, query);
       }, 300);
+    });
+
+    $("#productCategoryFilter").on("change", function () {
+      productListPage = 1;
+      loadProductList(1);
+    });
+
+    $("#searchCategoryList").on("input", function () {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        categoryListPage = 1;
+        loadCategoryList(1);
+      }, 300);
+    });
+
+    $("#addProductFromPage").on("click", function () {
+      $("#saveProduct").get(0).reset();
+      $("#current_img").text("");
+      $("#product_id").val("");
+    });
+
+    $("#addCategoryFromPage").on("click", function () {
+      $("#categoryName").val("");
+      $("#category_id").val("");
     });
 
     if (settings && validator.unescape(String(settings.symbol))) {
@@ -525,7 +576,7 @@ if (auth == undefined) {
     function loadCategories() {
       $.get(api + "categories/all?limit=1000", function (data) {
         allCategories = data.data;
-        loadCategoryList();
+        populateProductCategoryFilter();
         $("#category,#categories").html(`<option value="0">Select</option>`);
         allCategories.forEach((category) => {
           $("#category,#categories").append(
@@ -1520,31 +1571,32 @@ if (auth == undefined) {
     $("#transactions").on("click", function () {
       loadTransactions();
       loadUserList();
-
-      $("#pos_view").hide();
-      $("#out_of_stock_view").hide();
-      $("#pointofsale").show();
-      $("#transactions_view").show();
+      showAppView("#transactions_view");
       $(this).hide();
     });
 
     $("#pointofsale").on("click", function () {
-      $("#pos_view").show();
-      $("#out_of_stock_view").hide();
-      $("#transactions").show();
-      $("#transactions_view").hide();
+      showAppView("#pos_view");
       $(this).hide();
     });
 
     $("#outOfStockLink").on("click", function (e) {
       e.preventDefault();
       loadOutOfStock();
+      showAppView("#out_of_stock_view");
+    });
 
-      $("#pos_view").hide();
-      $("#transactions_view").hide();
-      $("#transactions").show();
-      $("#pointofsale").show();
-      $("#out_of_stock_view").show();
+    $("#productModal").on("click", function (e) {
+      e.preventDefault();
+      populateProductCategoryFilter();
+      loadProductList(1);
+      showAppView("#products_view");
+    });
+
+    $("#categoryModal").on("click", function (e) {
+      e.preventDefault();
+      loadCategoryList(1);
+      showAppView("#categories_view");
     });
 
     $("#viewRefOrders").on("click", function () {
@@ -1562,6 +1614,7 @@ if (auth == undefined) {
     $("#newProductModal").on("click", function () {
       $("#saveProduct").get(0).reset();
       $("#current_img").text("");
+      $("#product_id").val("");
     });
 
     $("#saveProduct").submit(function (e) {
@@ -1627,6 +1680,7 @@ if (auth == undefined) {
         success: function (data, textStatus, jqXHR) {
           $("#saveCategory").get(0).reset();
           loadCategories();
+          loadCategoryList(categoryListPage);
           loadProducts();
           diagOptions = {
             title: "Category Saved",
@@ -1651,7 +1705,6 @@ if (auth == undefined) {
     });
 
     $.fn.editProduct = function (id) {
-      $("#Products").modal("hide");
       $.get(api + "inventory/product/" + id, function (product) {
         $("#category option")
           .filter(function () {
@@ -1705,7 +1758,6 @@ if (auth == undefined) {
     };
 
     $.fn.editCategory = function (id) {
-      $("#Categories").modal("hide");
       $.get(api + "categories/category/" + id, function (category) {
         $("#categoryName").val(category.name);
         $("#category_id").val(category.id);
@@ -1770,6 +1822,7 @@ if (auth == undefined) {
         title: "Are you sure?",
         text: "You are about to delete this category.",
         okButtonText: "Yes, delete it!",
+        cancelButtonText: "Cancel",
       };
 
       notiflix.Confirm.show(
@@ -1783,6 +1836,7 @@ if (auth == undefined) {
             type: "DELETE",
             success: function (result) {
               loadCategories();
+              loadCategoryList(categoryListPage);
               notiflix.Report.success("Done!", "Category deleted", "Ok");
             },
           });
@@ -1790,16 +1844,8 @@ if (auth == undefined) {
       );
     };
 
-    $("#productModal").on("click", function () {
-      loadProductList();
-    });
-
     $("#usersModal").on("click", function () {
       loadUserList();
-    });
-
-    $("#categoryModal").on("click", function () {
-      loadCategoryList();
     });
 
     function loadUserList(page = 1) {
@@ -1863,32 +1909,43 @@ if (auth == undefined) {
     }
 
     function loadProductList(page = 1, query = "") {
-      let limit = 10;
+      productListPage = page || 1;
+      const limit = productListLimit;
 
       if (query == "" && $("#searchProductList").val() != "") {
         query = $("#searchProductList").val();
       }
 
-      let url = api + "inventory/products?page=" + page + "&limit=" + limit;
-      if (query != "") url += "&q=" + query;
+      const categoryId = $("#productCategoryFilter").val() || "";
+      let url =
+        api +
+        "inventory/products?page=" +
+        productListPage +
+        "&limit=" +
+        limit;
+      if (query != "") url += "&q=" + encodeURIComponent(query);
+      if (categoryId) url += "&category_id=" + encodeURIComponent(categoryId);
 
       $.get(url, function (response) {
-        let products = response.data;
-        let total = response.total;
+        let products = response.data || [];
+        let total = response.total || 0;
 
         let product_list = "";
-        let counter = 0;
         $("#product_list").empty();
 
-        products.forEach((product, index) => {
-          counter++;
+        if (!products.length) {
+          $("#productListEmpty").show();
+        } else {
+          $("#productListEmpty").hide();
+        }
 
+        products.forEach((product) => {
           let category = allCategories.filter(function (cat) {
             return parseInt(cat.id) === parseInt(product.category_id);
           });
 
           product.stockAlert = "";
-          const todayDate = moment();
+          let icon = "";
           const expiryDate = moment(product.expirationDate, DATE_FORMAT);
 
           const stockStatus = getStockStatus(
@@ -1908,8 +1965,8 @@ if (auth == undefined) {
             product.stockAlert = `<p class="text-danger"><small><i class="${icon}"></i> ${product.stockStatus}</small></p>`;
           }
           product.expiryAlert = "";
-          if (!isExpired(expiryDate)) {
-            const diffDays = daysToExpire(expiryDate);
+          if (!isExpired(product.expirationDate)) {
+            const diffDays = daysToExpire(product.expirationDate);
 
             if (diffDays > 0 && diffDays <= 30) {
               var days_noun = diffDays > 1 ? "days" : "day";
@@ -1917,63 +1974,105 @@ if (auth == undefined) {
               product.expiryStatus = `${diffDays} ${days_noun} left`;
               product.expiryAlert = `<p class="text-danger"><small><i class="${icon}"></i> ${product.expiryStatus}</small></p>`;
             }
-          } else {
+          } else if (product.expirationDate) {
             icon = "fa fa-exclamation-triangle";
             product.expiryStatus = "Expired";
             product.expiryAlert = `<p class="text-danger"><small><i class="${icon}"></i> ${product.expiryStatus}</small></p>`;
           }
 
-          let safe_product_generic = DOMPurify.sanitize(String(product.generic || ""));
-          let safe_product_name = DOMPurify.sanitize(String(product.name || ""));
+          let safe_product_generic = DOMPurify.sanitize(
+            String(product.generic || ""),
+          );
+          let safe_product_name = DOMPurify.sanitize(
+            String(product.name || ""),
+          );
+          const priceDisplay = moneyFormat(
+            parseFloat(product.price || 0).toFixed(2),
+          );
           product_list += `<tr>
               <td>${product.generic && product.generic !== "undefined" ? safe_product_generic : safe_product_name}</td>
               <td>${safe_product_name}
               ${product.expiryAlert}</td>
-              <td>${validator.unescape(settings.symbol)}${product.price}</td>
+              <td>${validator.unescape(settings.symbol)}${priceDisplay}</td>
               <td>${product.stock == 1 ? product.quantity : "N/A"}
               ${product.stockAlert}
               </td>
-              <td>${product.expirationDate}</td>
-              <td>${category.length > 0 && category[0] ? category[0].name : ""}</td>
+              <td>${product.expirationDate || ""}</td>
+              <td>${category.length > 0 && category[0] ? DOMPurify.sanitize(String(category[0].name || "")) : ""}</td>
               <td class="nobr"><span class="btn-group"><button onClick="$(this).editProduct(${product.id})" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteProduct(${
                 product.id
               })" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></button></span></td></tr>`;
         });
 
         $("#product_list").html(product_list);
-        renderPagination(total, limit, page, "loadProductList", "#productList");
+        Pagination.render({
+          total,
+          page: productListPage,
+          limit,
+          mount: "#productListPagination",
+          namespace: "productList",
+          showPageSize: true,
+          onPageChange: function (nextPage) {
+            loadProductList(nextPage, query);
+          },
+          onPageSizeChange: function (newLimit) {
+            productListLimit = newLimit;
+            loadProductList(1, query);
+          },
+        });
       });
     }
 
     function loadCategoryList(page = 1) {
-      let limit = 10;
-      let url = api + "categories/all?page=" + page + "&limit=" + limit;
+      categoryListPage = page || 1;
+      const limit = categoryListLimit;
+      const query = ($("#searchCategoryList").val() || "").trim();
+      let url =
+        api +
+        "categories/all?page=" +
+        categoryListPage +
+        "&limit=" +
+        limit;
+      if (query) url += "&q=" + encodeURIComponent(query);
 
       $.get(url, function (response) {
-        let categories = response.data;
-        let total = response.total;
+        let categories = response.data || [];
+        let total = response.total || 0;
 
         let category_list = "";
-        let counter = 0;
         $("#category_list").empty();
 
-        categories.forEach((category, index) => {
-          counter++;
+        if (!categories.length) {
+          $("#categoryListEmpty").show();
+        } else {
+          $("#categoryListEmpty").hide();
+        }
+
+        categories.forEach((category) => {
+          const safeName = DOMPurify.sanitize(String(category.name || ""));
           category_list += `<tr>
-            <td>${category.name}</td>
-            <td><span class="btn-group"><button onClick="$(this).editCategory(${category.id})" class="btn btn-warning"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteCategory(${
+            <td>${safeName}</td>
+            <td><span class="btn-group"><button onClick="$(this).editCategory(${category.id})" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteCategory(${
               category.id
-            })" class="btn btn-danger"><i class="fa fa-trash"></i></button></span></td></tr>`;
+            })" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></button></span></td></tr>`;
         });
 
         $("#category_list").html(category_list);
-        renderPagination(
+        Pagination.render({
           total,
+          page: categoryListPage,
           limit,
-          page,
-          "loadCategoryList",
-          "#categoryList",
-        );
+          mount: "#categoryListPagination",
+          namespace: "categoryList",
+          showPageSize: true,
+          onPageChange: function (nextPage) {
+            loadCategoryList(nextPage);
+          },
+          onPageSizeChange: function (newLimit) {
+            categoryListLimit = newLimit;
+            loadCategoryList(1);
+          },
+        });
       });
     }
 

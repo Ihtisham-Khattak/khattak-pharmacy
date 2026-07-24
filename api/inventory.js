@@ -85,19 +85,32 @@ app.get("/products", function (req, res) {
   let query = "SELECT * FROM inventory";
   let countQuery = "SELECT COUNT(*) as count FROM inventory";
   let params = [];
+  let where = [];
 
   if (req.query.q !== undefined && req.query.q !== "") {
     let searchTerm = `%${req.query.q}%`;
     let idSearch = parseInt(req.query.q);
     if (!isNaN(idSearch)) {
-      query += " WHERE name LIKE ? OR id = ?";
-      countQuery += " WHERE name LIKE ? OR id = ?";
-      params = [searchTerm, idSearch];
+      where.push("(name LIKE ? OR generic LIKE ? OR id = ?)");
+      params.push(searchTerm, searchTerm, idSearch);
     } else {
-      query += " WHERE name LIKE ?";
-      countQuery += " WHERE name LIKE ?";
-      params = [searchTerm];
+      where.push("(name LIKE ? OR generic LIKE ?)");
+      params.push(searchTerm, searchTerm);
     }
+  }
+
+  if (req.query.category_id !== undefined && req.query.category_id !== "") {
+    const categoryId = parseInt(req.query.category_id);
+    if (!isNaN(categoryId) && categoryId > 0) {
+      where.push("category_id = ?");
+      params.push(categoryId);
+    }
+  }
+
+  if (where.length) {
+    const clause = " WHERE " + where.join(" AND ");
+    query += clause;
+    countQuery += clause;
   }
 
   try {
