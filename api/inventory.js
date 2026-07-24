@@ -160,15 +160,58 @@ app.post("/product", requirePermission("perm_products"), function (req, res) {
       });
     }
 
+    const userId = req.user && req.user.id;
     if (id === "") {
-      const result = db
-        .prepare(
+      const runCreate = db.transaction(() => {
+        const result = db
+          .prepare(
+            `
+          INSERT INTO inventory (name, generic, category_id, price, quantity, minStock, expirationDate, stock, strength, form)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+          )
+          .run(
+            name,
+            generic,
+            category,
+            price,
+            quantity,
+            minStock,
+            expirationDate,
+            stock,
+            strength,
+            form,
+          );
+        const newId = result.lastInsertRowid;
+        if (quantity !== 0) {
+          recordStockMovement(db, {
+            productId: newId,
+            qtyDelta: quantity,
+            reason: "adjust",
+            refType: "inventory",
+            refId: String(newId),
+            userId,
+          });
+        }
+        syncOutOfStock(db, newId);
+      });
+      runCreate();
+      res.sendStatus(200);
+    } else {
+      const productId = parseInt(id, 10);
+      const runUpdate = db.transaction(() => {
+        const previous = db
+          .prepare("SELECT quantity FROM inventory WHERE id = ?")
+          .get(productId);
+        db.prepare(
           `
-        INSERT INTO inventory (name, generic, category_id, price, quantity, minStock, expirationDate, stock, strength, form)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-        )
-        .run(
+          UPDATE inventory SET 
+            name = ?, generic = ?, category_id = ?, 
+            price = ?, quantity = ?, minStock = ?, 
+            expirationDate = ?, stock = ?, strength = ?, form = ?
+          WHERE id = ?
+        `,
+        ).run(
           name,
           generic,
           category,
@@ -179,59 +222,23 @@ app.post("/product", requirePermission("perm_products"), function (req, res) {
           stock,
           strength,
           form,
-        );
-      const newId = result.lastInsertRowid;
-      if (quantity !== 0) {
-        recordStockMovement(db, {
-          productId: newId,
-          qtyDelta: quantity,
-          reason: "adjust",
-          refType: "inventory",
-          refId: String(newId),
-          userId: req.user && req.user.id,
-        });
-      }
-      syncOutOfStock(db, newId);
-      res.sendStatus(200);
-    } else {
-      const productId = parseInt(id, 10);
-      const previous = db
-        .prepare("SELECT quantity FROM inventory WHERE id = ?")
-        .get(productId);
-      db.prepare(
-        `
-        UPDATE inventory SET 
-          name = ?, generic = ?, category_id = ?, 
-          price = ?, quantity = ?, minStock = ?, 
-          expirationDate = ?, stock = ?, strength = ?, form = ?
-        WHERE id = ?
-      `,
-      ).run(
-        name,
-        generic,
-        category,
-        price,
-        quantity,
-        minStock,
-        expirationDate,
-        stock,
-        strength,
-        form,
-        productId,
-      );
-      const prevQty = previous ? previous.quantity : 0;
-      const delta = quantity - prevQty;
-      if (delta !== 0) {
-        recordStockMovement(db, {
           productId,
-          qtyDelta: delta,
-          reason: "adjust",
-          refType: "inventory",
-          refId: String(productId),
-          userId: req.user && req.user.id,
-        });
-      }
-      syncOutOfStock(db, productId);
+        );
+        const prevQty = previous ? previous.quantity : 0;
+        const delta = quantity - prevQty;
+        if (delta !== 0) {
+          recordStockMovement(db, {
+            productId,
+            qtyDelta: delta,
+            reason: "adjust",
+            refType: "inventory",
+            refId: String(productId),
+            userId,
+          });
+        }
+        syncOutOfStock(db, productId);
+      });
+      runUpdate();
       res.sendStatus(200);
     }
   } catch (err) {
@@ -246,8 +253,30 @@ app.post("/product", requirePermission("perm_products"), function (req, res) {
  */
 app.delete("/product/:productId", requirePermission("perm_products"), function (req, res) {
   try {
-    db.prepare("DELETE FROM inventory WHERE id = ?").run(
-      parseInt(req.params.productId),
+    const productId = parseInt(req.params.productId, 10);
+    if (isNaN(productId)) {
+      return res.status(400).json({
+        error: "Bad Request",
+        message: "Invalid product id.",
+      });
+    }
+
+    const referenced = db
+      .prepare(
+        "SELECT 1 AS hit FROM transaction_items WHERE product_id = ? LIMIT 1",
+      )
+      .get(productId);
+    if (referenced) {
+      return res.status(409).json({
+        error: "Product In Use",
+        message:
+          "This product appears on past sales and cannot be deleted. Adjust stock to zero instead.",
+      });
+    }
+
+    db.prepare("DELETE FROM inventory WHERE id = ?").run(productId);
+    db.prepare("DELETE FROM out_of_stock_products WHERE product_id = ?").run(
+      productId,
     );
     res.sendStatus(200);
   } catch (err) {
@@ -276,8 +305,8 @@ app.decrementInventory = function (products) {
 
   const transaction = db.transaction((products) => {
     for (const product of products) {
-      const productId = parseInt(product.id);
-      const productQty = parseInt(product.quantity);
+      const productId = parseInt(product.id, 10);
+      const productQty = parseFloat(product.quantity);
 
       // Validate product exists
       const invProduct = checkStmt.get(productId);

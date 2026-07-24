@@ -485,6 +485,11 @@ overflow-y:scroll
   opacity: 0;
   animation: fade-in 1s ease-in-out forwards;
   z-index:9999;
+  pointer-events: none;
+}
+
+.splash.loading {
+  pointer-events: auto;
 }
 
 @keyframes fade-in {

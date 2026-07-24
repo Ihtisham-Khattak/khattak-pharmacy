@@ -29,14 +29,8 @@ const paths = {
     ],
     js: [
         "renderer.js",
-        "assets/plugins/bootstrap/bootstrap.min.js",
-        "assets/plugins/chosen/chosen.jquery.min.js",
-        "assets/plugins/jquery-ui/jquery.form.min.js",
-        "assets/plugins/daterangepicker/daterangepicker.min.js",
-        "assets/plugins/dataTables/jquery.dataTables.min.js",
-        "assets/plugins/dataTables/dataTables.bootstrap.min.js",
-        "assets/plugins/dataTables/dataTables.buttons.min.js",
-        "assets/plugins/dataTables/buttons.html5.min.js",
+        // jQuery plugins are required from renderer.js so they bind to the
+        // same window.jQuery instance under Electron nodeIntegration.
         "assets/plugins/dataTables/pdfmake.min.js",
         "assets/plugins/dataTables/vfs_fonts.js",
     ],

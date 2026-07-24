@@ -43,6 +43,19 @@ function destroySession(token) {
   }
 }
 
+function destroySessionsForUser(userId) {
+  const id = parseInt(userId, 10);
+  if (isNaN(id)) return 0;
+  let removed = 0;
+  for (const [token, session] of sessions.entries()) {
+    if (session && session.id === id) {
+      sessions.delete(token);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
 /**
  * Retrieves the session object for a token, or undefined if not found.
  * @param {string} token
@@ -61,6 +74,19 @@ function updateSession(token, patch) {
   const session = sessions.get(token);
   if (!session) return;
   Object.assign(session, patch);
+}
+
+function updateSessionsForUser(userId, patch) {
+  const id = parseInt(userId, 10);
+  if (isNaN(id) || !patch) return 0;
+  let updated = 0;
+  for (const session of sessions.values()) {
+    if (session && session.id === id) {
+      Object.assign(session, patch);
+      updated += 1;
+    }
+  }
+  return updated;
 }
 
 function isPasswordChangeAllowedPath(req) {
@@ -129,8 +155,10 @@ function requirePermission(permKey) {
 module.exports = {
   createSession,
   destroySession,
+  destroySessionsForUser,
   getSession,
   updateSession,
+  updateSessionsForUser,
   requireAuth,
   requirePermission,
 };

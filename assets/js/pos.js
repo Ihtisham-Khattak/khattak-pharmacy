@@ -9,19 +9,8 @@ let fs = require("fs");
 let path = require("path");
 let moment = require("moment");
 const crypto = require("crypto");
-const desktop = typeof window !== "undefined" ? window.pharmaDesktop : null;
-let ipcRenderer;
-try {
-  ipcRenderer = require("electron").ipcRenderer;
-} catch (e) {
-  ipcRenderer = null;
-}
-let Store;
-try {
-  Store = require("electron-store");
-} catch (e) {
-  Store = null;
-}
+let { ipcRenderer } = require("electron");
+let Store = require("electron-store");
 let dotInterval = setInterval(function () {
   $(".dot").text(".");
 }, 3000);
@@ -47,18 +36,23 @@ let method = "";
 let order_index = 0;
 let user_index = 0;
 let product_index = 0;
-const appName =
-  (desktop && desktop.paths && desktop.paths.appName) ||
-  process.env.APPNAME ||
-  "PharmaSpot";
-const appData =
-  (desktop && desktop.paths && desktop.paths.appData) ||
-  process.env.APPDATA ||
-  "";
+const appName = process.env.APPNAME || "PharmaSpot";
+const appData = process.env.APPDATA || require("os").homedir();
 let host = "localhost";
 let port = process.env.PORT;
 let img_path = path.join(appData, appName, "uploads", "/");
-let api = "http://" + host + ":" + port + "/api/";
+let api = "http://" + host + ":" + (port || "0") + "/api/";
+
+function hideCheckoutLoading() {
+  if (window.Notiflix && Notiflix.Loading) {
+    Notiflix.Loading.remove();
+  }
+}
+
+function isNumeric(value) {
+  if (value === null || value === undefined || value === "") return false;
+  return !isNaN(parseFloat(value)) && isFinite(Number(value));
+}
 let categories = [];
 let holdOrderList = [];
 let customerOrderList = [];
@@ -69,32 +63,7 @@ let auth_error = "Incorrect username or password";
 let auth_empty = "Please enter a username and password";
 let holdOrderlocation = $("#renderHoldOrders");
 let customerOrderLocation = $("#renderCustomerOrders");
-const storage =
-  desktop && desktop.store
-    ? desktop.store
-    : Store
-      ? new Store()
-      : {
-          get: () => undefined,
-          set: () => {},
-          delete: () => {},
-          clear: () => {},
-        };
-function desktopSend(channel, ...args) {
-  if (desktop && desktop.ipc && desktop.ipc.send) {
-    desktop.ipc.send(channel, ...args);
-  } else if (ipcRenderer) {
-    desktopSend(channel, ...args);
-  }
-}
-function desktopOn(channel, listener) {
-  if (desktop && desktop.ipc && desktop.ipc.on) {
-    return desktop.ipc.on(channel, listener);
-  }
-  if (ipcRenderer) {
-    ipcRenderer.on(channel, (event, ...args) => listener(...args));
-  }
-}
+let storage = new Store();
 let settings;
 let platform;
 let user = {};
@@ -475,6 +444,12 @@ auth = storage.get("auth");
 user = storage.get("user");
 
 let token = storage.get("token");
+if (auth && (!user || !user.id || !token)) {
+  storage.clear();
+  auth = undefined;
+  user = {};
+  token = undefined;
+}
 if (token) {
   $.ajaxSetup({ headers: { "X-Access-Token": token } });
 }
@@ -482,7 +457,7 @@ if (token) {
 $(document).ajaxError(function (event, jqXHR) {
   if (jqXHR.status === 401) {
     storage.clear();
-    desktopSend("app-reload", "");
+    ipcRenderer.send("app-reload", "");
     return;
   }
   if (
@@ -491,6 +466,7 @@ $(document).ajaxError(function (event, jqXHR) {
     jqXHR.responseJSON.error === "PasswordChangeRequired"
   ) {
     $("#forcePasswordModal").modal("show");
+    $("#main_app").show();
   }
 });
 
@@ -502,16 +478,19 @@ if (auth == undefined) {
 } else {
   $("#login").hide();
   if (user && user.must_change_password) {
+    $("#main_app").show();
     $("#forcePasswordModal").modal("show");
   } else {
     $("#main_app").show();
   }
-  platform = storage.get("settings");
+  platform = storage.get("settings") || {
+    app: "Point of Sale",
+    till: 1,
+    mac: "",
+  };
 
-  if (platform != undefined) {
-    if (platform.app == "Network Point of Sale Terminal") {
-      api = "http://" + platform.ip + ":" + port + "/api/";
-    }
+  if (platform.app == "Network Point of Sale Terminal") {
+    api = "http://" + platform.ip + ":" + port + "/api/";
   }
 
   $.get(api + "users/user/" + user.id, function (data) {
@@ -520,12 +499,22 @@ if (auth == undefined) {
   });
 
   $.get(api + "settings/get", function (data) {
-    settings = data.settings;
+    settings = data && data.settings ? data.settings : null;
+  }).fail(function () {
+    settings = null;
   });
 
-  $.get(api + "users/all", function (users) {
-    allUsers = [...users];
-  });
+  if (user && Number(user.perm_users) === 1) {
+    $.get(api + "users/all", function (response) {
+      allUsers = Array.isArray(response)
+        ? [...response]
+        : Array.isArray(response && response.data)
+          ? [...response.data]
+          : [];
+    });
+  } else {
+    allUsers = [];
+  }
 
   $(document).ready(function () {
     //update title based on company
@@ -608,20 +597,25 @@ if (auth == undefined) {
     }
 
     setTimeout(function () {
-      if (settings == undefined && auth != undefined) {
+      if (settings == null && auth != undefined) {
         $("#settingsModal").modal("show");
-      } else {
-        vat = parseFloat(validator.unescape(String(settings.percentage)));
+      } else if (settings) {
+        vat = parseFloat(validator.unescape(String(settings.percentage))) || 0;
         $("#taxInfo").text(settings.charge_tax ? vat : 0);
       }
     }, 1500);
 
+    let settingsPromptBlocked = false;
     $("#settingsModal").on("hide.bs.modal", function () {
+      if (settingsPromptBlocked) return;
       setTimeout(function () {
-        if (settings == undefined && auth != undefined) {
-          $("#settingsModal").modal("show");
+        if (settings == null && auth != undefined) {
+          settingsPromptBlocked = true;
+          notiflix.Notify.warning(
+            "Store settings are required. Open Settings from the menu to continue.",
+          );
         }
-      }, 1000);
+      }, 300);
     });
 
     if (0 == user.perm_products) {
@@ -646,8 +640,8 @@ if (auth == undefined) {
       if (query != "") url += "&q=" + query;
 
       $.get(url, function (response) {
-        let data = response.data;
-        let total = response.total;
+        let data = (response && response.data) || [];
+        let total = (response && response.total) || 0;
 
         allProducts = [...data];
 
@@ -1155,8 +1149,10 @@ if (auth == undefined) {
             type = "Cash";
         }
 
-        // Fix #8: Show loading state with disabled button
-        $(".loading").show();
+        // Fix #8: Show loading without re-showing the boot splash overlay.
+        if (window.Notiflix && Notiflix.Loading) {
+          Notiflix.Loading.standard("Processing…");
+        }
         $("#dueModal button").prop("disabled", true);
 
         if (holdOrder != 0) {
@@ -1202,10 +1198,10 @@ if (auth == undefined) {
           if (cart.length > 0) {
             printJS({ printable: receipt, type: "raw-html" });
 
-            $(".loading").hide();
+            hideCheckoutLoading();
             return;
           } else {
-            $(".loading").hide();
+            hideCheckoutLoading();
             return;
           }
         }
@@ -1230,8 +1226,8 @@ if (auth == undefined) {
           change: change,
           _id: orderNumber,
           id: orderNumber,
-          till: platform.till,
-          mac: platform.mac,
+          till: platform && platform.till != null ? platform.till : 1,
+          mac: platform && platform.mac ? platform.mac : "",
           user: user.fullname,
           user_id: user.id,
         };
@@ -1255,7 +1251,7 @@ if (auth == undefined) {
             $("#voidTransactionBtn").hide();
             $("#orderModal").modal("show");
             loadProducts();
-            $(".loading").hide();
+            hideCheckoutLoading();
             // Fix #8: Re-enable buttons
             $("#dueModal button").prop("disabled", false);
             $("#confirmPayment").prop("disabled", false);
@@ -1272,7 +1268,7 @@ if (auth == undefined) {
 
           // Fix #1 & #2: Improved error handling with actual error message
           error: function (xhr, textStatus, errorThrown) {
-            $(".loading").hide();
+            hideCheckoutLoading();
             // Fix #2: Use hide instead of toggle to properly close modal
             $("#dueModal").modal("hide");
             // Fix #8: Re-enable buttons
@@ -1317,7 +1313,7 @@ if (auth == undefined) {
         // Fields are cleared in success handler to prevent data loss on error
       } catch (err) {
         console.error("Critical error in submitDueOrder:", err);
-        $(".loading").hide();
+        hideCheckoutLoading();
         // Fix #8: Re-enable buttons on error
         $("#dueModal button").prop("disabled", false);
         $("#confirmPayment").prop("disabled", false);
@@ -1613,7 +1609,9 @@ if (auth == undefined) {
 
     $("#transactions").on("click", function () {
       loadTransactions();
-      loadUserList();
+      if (user && Number(user.perm_users) === 1) {
+        loadUserList();
+      }
       showAppView("#transactions_view");
       $(this).hide();
     });
@@ -1901,8 +1899,8 @@ if (auth == undefined) {
       let url = api + "users/all?page=" + page + "&limit=" + limit;
 
       $.get(url, function (response) {
-        let users = response.data;
-        let total = response.total;
+        let users = (response && response.data) || [];
+        let total = (response && response.total) || 0;
         allUsers = [...users];
 
         let counter = 0;
@@ -2146,7 +2144,7 @@ if (auth == undefined) {
             storage.delete("auth");
             storage.delete("user");
             storage.delete("token");
-            desktopSend("app-reload", "");
+            ipcRenderer.send("app-reload", "");
           });
         },
       );
@@ -2154,62 +2152,57 @@ if (auth == undefined) {
 
     $("#settings_form").on("submit", function (e) {
       e.preventDefault();
-      let formData = $(this).serializeObject();
-      let mac_address;
+      const $form = $(this);
+      let formData = $form.serializeObject();
 
       api = "http://" + host + ":" + port + "/api/";
 
-      macaddress.one(function (err, mac) {
-        mac_address = mac;
-      });
       const appChoice = $("#app").find("option:selected").text();
-
       formData["app"] = appChoice;
-      formData["mac"] = mac_address;
       formData["till"] = 1;
 
       let $appField = $("#settings_form input[name='app']");
-      let $hiddenAppField = $("<input>", {
-        type: "hidden",
-        name: "app",
-        value: formData.app,
-      });
       $appField.length
         ? $appField.val(formData.app)
         : $("#settings_form").append(
-            `<input type="hidden" name="app" value="${$hiddenAppField}" />`,
+            `<input type="hidden" name="app" value="${String(formData.app || "").replace(/"/g, "&quot;")}" />`,
           );
 
-      if (
-        formData.percentage != "" &&
-        typeof formData.percentage === "number"
-      ) {
+      const taxPct = parseFloat(formData.percentage);
+      if (formData.percentage === "" || isNaN(taxPct) || taxPct < 0) {
         notiflix.Report.warning(
           "Oops!",
-          "Please make sure the tax value is a number",
+          "Please make sure the tax value is a valid number",
           "Ok",
         );
-      } else {
+        return;
+      }
+
+      formData.percentage = taxPct;
+
+      macaddress.one(function (err, mac) {
+        formData["mac"] = mac || "";
         storage.set("settings", formData);
 
-        $(this).attr("action", api + "settings/post");
-        $(this).attr("method", "POST");
+        $form.attr("action", api + "settings/post");
+        $form.attr("method", "POST");
 
-        $(this).ajaxSubmit({
+        $form.ajaxSubmit({
           contentType: "application/json",
           success: function () {
-            desktopSend("app-reload", "");
+            ipcRenderer.send("app-reload", "");
           },
           error: function (jqXHR) {
-            console.error(jqXHR.responseJSON.message);
+            console.error(jqXHR.responseJSON && jqXHR.responseJSON.message);
             notiflix.Report.failure(
-              jqXHR.responseJSON.error,
-              jqXHR.responseJSON.message,
+              (jqXHR.responseJSON && jqXHR.responseJSON.error) || "Error",
+              (jqXHR.responseJSON && jqXHR.responseJSON.message) ||
+                "Could not save settings.",
               "Ok",
             );
           },
         });
-      }
+      });
     });
 
     $("#net_settings_form").on("submit", function (e) {
@@ -2226,7 +2219,7 @@ if (auth == undefined) {
         if (isNumeric(formData.till)) {
           formData["app"] = $("#app").find("option:selected").text();
           storage.set("settings", formData);
-          desktopSend("app-reload", "");
+          ipcRenderer.send("app-reload", "");
         } else {
           notiflix.Report.warning(
             "Oops!",
@@ -2261,7 +2254,7 @@ if (auth == undefined) {
         processData: false,
         success: function (data) {
           if (ownUserEdit) {
-            desktopSend("app-reload", "");
+            ipcRenderer.send("app-reload", "");
           } else {
             $("#userModal").modal("hide");
 
@@ -2309,7 +2302,7 @@ if (auth == undefined) {
 
       for (perm of permissions) {
         var el = "#" + perm;
-        if (allUsers[index][perm] == 1) {
+        if (user[perm] == 1) {
           $(el).prop("checked", true);
         } else {
           $(el).prop("checked", false);
@@ -2318,7 +2311,7 @@ if (auth == undefined) {
     });
 
     $("#add-user").on("click", function () {
-      if (platform.app != "Network Point of Sale Terminal") {
+      if (!platform || platform.app != "Network Point of Sale Terminal") {
         $(".perms").show();
       }
 
@@ -2327,7 +2320,15 @@ if (auth == undefined) {
     });
 
     $("#settings").on("click", function () {
-      if (platform.app == "Network Point of Sale Terminal") {
+      if (!settings && (!platform || platform.app != "Network Point of Sale Terminal")) {
+        notiflix.Report.warning(
+          "Settings unavailable",
+          "Store settings could not be loaded. Check that the server is running and try again.",
+          "Ok",
+        );
+        return;
+      }
+      if (platform && platform.app == "Network Point of Sale Terminal") {
         $("#net_settings_form").show(500);
         $("#settings_form").hide(500);
 
@@ -2775,8 +2776,8 @@ function loadOutOfStock(page = 1) {
   if (sort !== "") url += "&sort=" + encodeURIComponent(sort);
 
   $.get(url, function (response) {
-    let data = response.data;
-    let total = response.total;
+    let data = (response && response.data) || [];
+    let total = (response && response.total) || 0;
 
     $("#outOfStockTableBody").empty();
 
@@ -2973,10 +2974,11 @@ $("body").on("submit", "#account", function (e) {
           $.ajaxSetup({ headers: { "X-Access-Token": data.token } });
           $("#login").hide();
           if (data.user && data.user.must_change_password) {
+            $("#main_app").show();
             $("#forcePasswordModal").modal("show");
             return;
           }
-          desktopSend("app-reload", "");
+          ipcRenderer.send("app-reload", "");
         } else if (data.error === "AccountInactive") {
           notiflix.Report.warning(
             "Account Inactive",
@@ -3014,7 +3016,7 @@ $("#forcePasswordForm").on("submit", function (e) {
       storage.set("user", storedUser);
       $("#forcePasswordModal").modal("hide");
       notiflix.Notify.success("Password updated.");
-      desktopSend("app-reload", "");
+      ipcRenderer.send("app-reload", "");
     },
     error: function (jqXHR) {
       const msg =
@@ -3040,11 +3042,14 @@ $("#quit").on("click", function () {
     diagOptions.okButtonText,
     diagOptions.cancelButtonText,
     () => {
-      desktopSend("app-quit", "");
+      ipcRenderer.send("app-quit", "");
     },
   );
 });
 
-desktopOn("click-element", (elementId) => {
-  document.getElementById(elementId).click();
+ipcRenderer.on("click-element", (event, elementId) => {
+  const el = document.getElementById(elementId);
+  if (el) {
+    el.click();
+  }
 });

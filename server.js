@@ -33,14 +33,34 @@ process.env.APPDATA = app.getPath("appData");
 process.env.APPNAME = pkg.name;
 const PORT = process.env.PORT || 0;
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per window
+  windowMs: 15 * 60 * 1000,
+  max: 5000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: function (req) {
+    const ip = req.ip || "";
+    return (
+      ip === "127.0.0.1" ||
+      ip === "::1" ||
+      ip === "::ffff:127.0.0.1" ||
+      ip === "localhost"
+    );
+  },
 });
 
 console.log("Server started");
 
 express.use(bodyParser.json());
 express.use(bodyParser.urlencoded({ extended: false }));
+
+// Rate-limit login only for remote clients; localhost POS is exempt above.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+express.use("/api/users/login", loginLimiter);
 express.use(limiter);
 
 express.all("/*", function (req, res, next) {

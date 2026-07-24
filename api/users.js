@@ -8,7 +8,9 @@ const { db, ensureForeignKeysEnabled } = require("./db");
 const {
   createSession,
   destroySession,
+  destroySessionsForUser,
   updateSession,
+  updateSessionsForUser,
   requireAuth,
   requirePermission,
 } = require("./middleware/auth");
@@ -283,9 +285,9 @@ app.delete(
   requirePermission("perm_users"),
   function (req, res) {
     try {
-      db.prepare("DELETE FROM users WHERE id = ?").run(
-        parseInt(req.params.userId),
-      );
+      const userId = parseInt(req.params.userId);
+      db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+      destroySessionsForUser(userId);
       res.sendStatus(200);
     } catch (err) {
       const isForeignKeyError =
@@ -461,6 +463,31 @@ app.post("/post", function (req, res) {
             ...activeValues,
             parseInt(userData.id),
           );
+        }
+        const updatedUserId = parseInt(userData.id, 10);
+        if (!restrictToSelfServiceFields) {
+          if (userData.is_active === 0) {
+            destroySessionsForUser(updatedUserId);
+          } else {
+            const sessionPatch = {
+              username: userData.username,
+              fullname: userData.fullname,
+              is_active: userData.is_active !== undefined ? userData.is_active : 1,
+            };
+            if (!restrictToSelfServiceFields) {
+              sessionPatch.perm_products = userData.perm_products;
+              sessionPatch.perm_categories = userData.perm_categories;
+              sessionPatch.perm_transactions = userData.perm_transactions;
+              sessionPatch.perm_users = userData.perm_users;
+              sessionPatch.perm_settings = userData.perm_settings;
+            }
+            if (hash !== undefined) {
+              sessionPatch.must_change_password = false;
+            }
+            updateSessionsForUser(updatedUserId, sessionPatch);
+          }
+        } else if (hash !== undefined) {
+          updateSessionsForUser(updatedUserId, { must_change_password: false });
         }
         res.sendStatus(200);
       } catch (err) {

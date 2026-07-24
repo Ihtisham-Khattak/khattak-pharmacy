@@ -28,10 +28,13 @@ function createWindow() {
         height: height,
         frame: true,
         webPreferences: {
-            preload: path.join(__dirname, "preload.js"),
+            // jQuery renderer still uses require()/electron-store directly.
+            // Do not enable contextIsolation or a contextBridge preload until
+            // that migration is complete — both blank the window.
             nodeIntegration: true,
             enableRemoteModule: false,
-            contextIsolation: true,
+            contextIsolation: false,
+            sandbox: false,
         },
     });
     menuController.initializeMainWindow(mainWindow); 
@@ -42,6 +45,18 @@ function createWindow() {
 
     mainWindow.on("closed", () => {
         mainWindow = null;
+    });
+
+    mainWindow.webContents.on("did-fail-load", (_e, code, desc, url) => {
+        console.error("Renderer failed to load:", code, desc, url);
+    });
+    mainWindow.webContents.on("render-process-gone", (_e, details) => {
+        console.error("Renderer process gone:", details);
+    });
+    mainWindow.webContents.on("console-message", (_e, level, message, line, sourceId) => {
+        if (level >= 2) {
+            console.error(`[renderer:${level}] ${message} (${sourceId}:${line})`);
+        }
     });
     
 }

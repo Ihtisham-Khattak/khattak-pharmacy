@@ -11,15 +11,29 @@ const {
 } = require("./schemaHelpers");
 const { requireAuth, requirePermission } = require("./middleware/auth");
 
-const EXPIRY_DATE_FORMAT = "DD-MMM-YYYY";
+function itemsSignature(items) {
+  if (!Array.isArray(items)) return "[]";
+  return JSON.stringify(
+    items
+      .map((item) => ({
+        id: parseInt(item.id, 10),
+        quantity: parseFloat(item.quantity) || 0,
+      }))
+      .filter((item) => !isNaN(item.id) && item.quantity > 0)
+      .sort((a, b) => a.id - b.id || a.quantity - b.quantity),
+  );
+}
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const EXPIRY_DATE_FORMATS = ["DD-MMM-YYYY", "YYYY-MM-DD", moment.ISO_8601];
 
 function isProductExpired(expirationDate) {
   if (!expirationDate) return false;
   const raw = String(expirationDate).trim();
   if (!raw) return false;
-  let expiry = moment(raw, EXPIRY_DATE_FORMAT, true);
+  let expiry = moment(raw, EXPIRY_DATE_FORMATS, true);
   if (!expiry.isValid()) {
     expiry = moment(raw);
   }
@@ -126,10 +140,14 @@ function voidTransactionById(id) {
     "UPDATE inventory SET quantity = quantity + ? WHERE id = ?",
   );
   const voidStmt = db.prepare(
-    "UPDATE transactions SET status = -1 WHERE id = ?",
+    "UPDATE transactions SET status = -1 WHERE id = ? AND status != -1",
   );
 
   const runVoid = db.transaction(() => {
+    const voided = voidStmt.run(id);
+    if (voided.changes === 0) {
+      throw Object.assign(new Error("Already voided"), { code: "ALREADY_VOIDED" });
+    }
     if (Array.isArray(items)) {
       for (const item of items) {
         const productId = parseInt(item.id);
@@ -153,12 +171,22 @@ function voidTransactionById(id) {
         sign: 1,
       });
     }
-    voidStmt.run(id);
   });
 
   try {
     runVoid();
   } catch (txErr) {
+    if (txErr && txErr.code === "ALREADY_VOIDED") {
+      return {
+        error: {
+          status: 400,
+          body: {
+            error: "Already Voided",
+            message: "This transaction has already been voided.",
+          },
+        },
+      };
+    }
     if (txErr && txErr.code && txErr.code.indexOf("SQLITE_CONSTRAINT") === 0) {
       return {
         error: {
@@ -437,7 +465,13 @@ function validateTransactionInputs(t) {
         },
       };
     }
-    subtotal += (parseFloat(product.price) || 0) * qty;
+    // Never persist client-supplied prices — overwrite with inventory truth.
+    const unitPrice = parseFloat(product.price) || 0;
+    item.id = productId;
+    item.quantity = qty;
+    item.price = unitPrice;
+    item.product_name = product.name;
+    subtotal += unitPrice * qty;
   }
 
   return { customerId, subtotal };
@@ -673,7 +707,29 @@ app.put("/new", function (req, res) {
       });
     }
 
+    if (existing.status === -1) {
+      return res.status(400).json({
+        error: "Already Voided",
+        message: "Voided transactions cannot be updated.",
+      });
+    }
+
     const nextStatus = parseInt(t.status, 10);
+    if (isNaN(nextStatus) || (nextStatus !== 0 && nextStatus !== 1)) {
+      return res.status(400).json({
+        error: "Invalid Status",
+        message: "Transaction status must be 0 (hold) or 1 (paid).",
+      });
+    }
+    // Only hold → paid is allowed as a status transition on update.
+    // Re-opening a paid sale as a hold would double-restore stock on later void.
+    if (existing.status === 1 && nextStatus === 0) {
+      return res.status(400).json({
+        error: "Invalid Transition",
+        message:
+          "A completed sale cannot be converted back to a hold. Void it instead.",
+      });
+    }
     const isHoldToPaid = existing.status === 0 && nextStatus === 1;
     if (!isHoldToPaid && req.user.perm_transactions !== 1) {
       return res.status(403).json({
@@ -682,9 +738,10 @@ app.put("/new", function (req, res) {
       });
     }
 
-    // Items must not change on update - see LIMITATION above.
+    // Items must not change on update - compare identity only (id + qty),
+    // not the full cart object (client includes sku/stock fields).
     const existingItems = readTransactionItems(db, existing);
-    if (JSON.stringify(existingItems) !== JSON.stringify(t.items)) {
+    if (itemsSignature(existingItems) !== itemsSignature(t.items)) {
       return res.status(400).json({
         error: "Items Changed",
         message:

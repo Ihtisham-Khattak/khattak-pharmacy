@@ -76,8 +76,8 @@
   "scripts": {
     "electron": "cross-env NODE_ENV=dev nodemon --exec \"\"electron .\"\"",
     "electron-build": "electron-builder",
-    "rebuild": "electron-rebuild",
-    "postinstall": "electron-rebuild",
+    "rebuild": "electron-rebuild -f -v $(node -p \"require('electron/package.json').version\")",
+    "postinstall": "electron-rebuild -f -v $(node -p \"require('electron/package.json').version\")",
     "package-win": "electron-packager . PharmaSpot --overwrite --asar=false --platform=win32 --arch=x64 --icon=assets/images/icon.ico --prune=true --out=release-builds --version-string.ProductName=\"PharmaSpot\"",
     "start": "electron-forge start",
     "package": "electron-forge package",
