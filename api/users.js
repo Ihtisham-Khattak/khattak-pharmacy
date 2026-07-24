@@ -8,9 +8,15 @@ const { db, ensureForeignKeysEnabled } = require("./db");
 const {
   createSession,
   destroySession,
+  updateSession,
   requireAuth,
   requirePermission,
 } = require("./middleware/auth");
+
+function isUserActive(user) {
+  if (user.is_active === undefined || user.is_active === null) return true;
+  return Number(user.is_active) === 1;
+}
 
 app.use(bodyParser.json());
 
@@ -24,7 +30,7 @@ module.exports = app;
 
 // Columns safe to return to clients - NEVER includes password.
 const SAFE_USER_COLUMNS =
-  "id, username, fullname, perm_products, perm_categories, perm_transactions, perm_users, perm_settings, status, must_change_password, created_at, updated_at";
+  "id, username, fullname, perm_products, perm_categories, perm_transactions, perm_users, perm_settings, status, must_change_password, is_active, created_at, updated_at";
 
 /**
  * GET endpoint: Get the welcome message for the Users API.
@@ -45,6 +51,13 @@ app.post("/login", function (req, res) {
       .get(username);
 
     if (user) {
+      if (!isUserActive(user)) {
+        return res.send({
+          auth: false,
+          error: "AccountInactive",
+          message: "This account has been deactivated. Contact an administrator.",
+        });
+      }
       bcrypt
         .compare(req.body.password, user.password)
         .then((result) => {
@@ -69,6 +82,7 @@ app.post("/login", function (req, res) {
                 perm_users: safeUser.perm_users,
                 perm_settings: safeUser.perm_settings,
                 must_change_password: !!user.must_change_password,
+                is_active: safeUser.is_active,
               },
             });
           } else {
@@ -116,6 +130,83 @@ app.get("/check", async function (req, res) {
 
 // Everything below this point requires authentication.
 app.use(requireAuth);
+
+/**
+ * POST endpoint: Change the current user's password.
+ * Allowed even when must_change_password is set (auth middleware whitelist).
+ */
+app.post("/change-password", function (req, res) {
+  const currentPassword = req.body.current_password;
+  const newPassword = req.body.new_password;
+
+  if (!newPassword || String(newPassword).length < 6) {
+    return res.status(400).json({
+      error: "Bad Request",
+      message: "New password must be at least 6 characters.",
+    });
+  }
+
+  try {
+    const row = db
+      .prepare("SELECT id, password FROM users WHERE id = ?")
+      .get(req.user.id);
+    if (!row) {
+      return res.status(404).json({
+        error: "Not Found",
+        message: "User not found.",
+      });
+    }
+
+    const finish = (hash) => {
+      db.prepare(
+        "UPDATE users SET password = ?, must_change_password = 0 WHERE id = ?",
+      ).run(hash, req.user.id);
+      const token = req.headers["x-access-token"];
+      updateSession(token, { must_change_password: false });
+      res.sendStatus(200);
+    };
+
+    if (req.user.must_change_password && !currentPassword) {
+      bcrypt
+        .hash(String(newPassword), saltRounds)
+        .then(finish)
+        .catch((err) =>
+          res
+            .status(500)
+            .json({ error: "Internal Server Error", message: err.message }),
+        );
+      return;
+    }
+
+    if (!currentPassword) {
+      return res.status(400).json({
+        error: "Bad Request",
+        message: "Current password is required.",
+      });
+    }
+
+    bcrypt
+      .compare(String(currentPassword), row.password)
+      .then((ok) => {
+        if (!ok) {
+          return res.status(400).json({
+            error: "Invalid Password",
+            message: "Current password is incorrect.",
+          });
+        }
+        return bcrypt.hash(String(newPassword), saltRounds).then(finish);
+      })
+      .catch((err) =>
+        res
+          .status(500)
+          .json({ error: "Internal Server Error", message: err.message }),
+      );
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", message: err.message });
+  }
+});
 
 /**
  * GET endpoint: Get user details by user ID.
@@ -236,6 +327,20 @@ app.post("/post", function (req, res) {
   // Self-service edits (without perm_users) may not change permission columns.
   const restrictToSelfServiceFields = req.user.perm_users !== 1 && isSelfEdit;
 
+  if (restrictToSelfServiceFields) {
+    delete userData.is_active;
+  } else if (userData.is_active !== undefined) {
+    userData.is_active =
+      userData.is_active === "on" ||
+      userData.is_active === 1 ||
+      userData.is_active === "1" ||
+      userData.is_active === true
+        ? 1
+        : 0;
+  } else if (userData.id === "") {
+    userData.is_active = 1;
+  }
+
   const perms = [
     "perm_products",
     "perm_categories",
@@ -270,8 +375,8 @@ app.post("/post", function (req, res) {
         const result = db
           .prepare(
             `
-          INSERT INTO users (username, fullname, password, perm_products, perm_categories, perm_transactions, perm_users, perm_settings, status, must_change_password)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO users (username, fullname, password, perm_products, perm_categories, perm_transactions, perm_users, perm_settings, status, must_change_password, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
           )
           .run(
@@ -285,6 +390,7 @@ app.post("/post", function (req, res) {
             userData.perm_settings,
             "",
             0,
+            userData.is_active !== undefined ? userData.is_active : 1,
           );
         res.send({ id: result.lastInsertRowid, ...userData });
       } catch (err) {
@@ -312,6 +418,14 @@ app.post("/post", function (req, res) {
               userData.perm_users,
               userData.perm_settings,
             ];
+        const activeClause = restrictToSelfServiceFields
+          ? ""
+          : ", is_active = ?";
+        const activeValues = restrictToSelfServiceFields
+          ? []
+          : [
+              userData.is_active !== undefined ? userData.is_active : 1,
+            ];
 
         if (hash !== undefined) {
           db.prepare(
@@ -319,6 +433,7 @@ app.post("/post", function (req, res) {
             UPDATE users SET
               username = ?, fullname = ?, password = ?,
               ${permClause} must_change_password = 0
+              ${activeClause}
             WHERE id = ?
           `,
           ).run(
@@ -326,6 +441,7 @@ app.post("/post", function (req, res) {
             userData.fullname,
             hash,
             ...permValues,
+            ...activeValues,
             parseInt(userData.id),
           );
         } else {
@@ -335,12 +451,14 @@ app.post("/post", function (req, res) {
             UPDATE users SET
               username = ?, fullname = ?
               ${permClause ? "," + permClause.slice(0, -1) : ""}
+              ${activeClause}
             WHERE id = ?
           `,
           ).run(
             userData.username,
             userData.fullname,
             ...permValues,
+            ...activeValues,
             parseInt(userData.id),
           );
         }

@@ -23,6 +23,11 @@ function createSession(user) {
     perm_users: user.perm_users,
     perm_settings: user.perm_settings,
     must_change_password: !!user.must_change_password,
+    is_active: user.is_active === undefined || user.is_active === null
+      ? 1
+      : user.is_active
+        ? 1
+        : 0,
   };
   sessions.set(token, safeUser);
   return { token, user: safeUser };
@@ -48,8 +53,32 @@ function getSession(token) {
 }
 
 /**
+ * Updates fields on an existing session (e.g. after password change).
+ * @param {string} token
+ * @param {object} patch
+ */
+function updateSession(token, patch) {
+  const session = sessions.get(token);
+  if (!session) return;
+  Object.assign(session, patch);
+}
+
+function isPasswordChangeAllowedPath(req) {
+  const url = req.originalUrl || req.url || "";
+  return (
+    /(?:^|\/)users\/change-password(?:\?|$|\/)/.test(url) ||
+    /(?:^|\/)change-password(?:\?|$|\/)/.test(url) ||
+    /(?:^|\/)users\/logout\//.test(url) ||
+    /(?:^|\/)logout\//.test(url) ||
+    /(?:^|\/)users\/user\//.test(url) ||
+    /(?:^|\/)user\//.test(url)
+  );
+}
+
+/**
  * Express middleware: requires a valid X-Access-Token header.
  * Sets req.user to the session object on success.
+ * Blocks most routes when must_change_password is set.
  */
 function requireAuth(req, res, next) {
   const token = req.headers["x-access-token"];
@@ -59,6 +88,21 @@ function requireAuth(req, res, next) {
     return res
       .status(401)
       .json({ error: "Unauthorized", message: "Not authenticated" });
+  }
+
+  if (session.is_active === 0) {
+    destroySession(token);
+    return res.status(403).json({
+      error: "AccountInactive",
+      message: "This account has been deactivated.",
+    });
+  }
+
+  if (session.must_change_password && !isPasswordChangeAllowedPath(req)) {
+    return res.status(403).json({
+      error: "PasswordChangeRequired",
+      message: "You must change your password before continuing.",
+    });
   }
 
   req.user = session;
@@ -86,6 +130,7 @@ module.exports = {
   createSession,
   destroySession,
   getSession,
+  updateSession,
   requireAuth,
   requirePermission,
 };

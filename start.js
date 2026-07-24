@@ -1,4 +1,3 @@
-require("@electron/remote/main").initialize();
 require("electron-store").initRenderer();
 const setupEvents = require("./installers/setupEvents");
 if (setupEvents.handleSquirrelEvent()) {
@@ -23,14 +22,16 @@ function createWindow() {
 
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
+    process.env.PHARMASPOT_USERDATA = app.getPath("userData");
     mainWindow = new BrowserWindow({
         width: width,
         height: height,
         frame: true,
         webPreferences: {
+            preload: path.join(__dirname, "preload.js"),
             nodeIntegration: true,
             enableRemoteModule: false,
-            contextIsolation: false,
+            contextIsolation: true,
         },
     });
     menuController.initializeMainWindow(mainWindow); 
@@ -44,10 +45,6 @@ function createWindow() {
     });
     
 }
-
-app.on("browser-window-created", (_, window) => {
-    require("@electron/remote/main").enable(window.webContents);
-});
 
 app.whenReady().then(() => {
     createWindow();
@@ -103,5 +100,3 @@ if (!isPackaged) {
         require("electron-reloader")(module);
     } catch (_) {}
 }
-
-

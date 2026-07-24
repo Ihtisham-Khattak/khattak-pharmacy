@@ -8,14 +8,23 @@ const _ = require("lodash");
 let fs = require("fs");
 let path = require("path");
 let moment = require("moment");
-let { ipcRenderer } = require("electron");
+const crypto = require("crypto");
+const desktop = typeof window !== "undefined" ? window.pharmaDesktop : null;
+let ipcRenderer;
+try {
+  ipcRenderer = require("electron").ipcRenderer;
+} catch (e) {
+  ipcRenderer = null;
+}
+let Store;
+try {
+  Store = require("electron-store");
+} catch (e) {
+  Store = null;
+}
 let dotInterval = setInterval(function () {
   $(".dot").text(".");
 }, 3000);
-let Store = require("electron-store");
-const crypto = require("crypto");
-const remote = require("@electron/remote");
-const app = remote.app;
 let cart = [];
 let index = 0;
 let allUsers = [];
@@ -38,8 +47,14 @@ let method = "";
 let order_index = 0;
 let user_index = 0;
 let product_index = 0;
-const appName = process.env.APPNAME;
-const appData = process.env.APPDATA;
+const appName =
+  (desktop && desktop.paths && desktop.paths.appName) ||
+  process.env.APPNAME ||
+  "PharmaSpot";
+const appData =
+  (desktop && desktop.paths && desktop.paths.appData) ||
+  process.env.APPDATA ||
+  "";
 let host = "localhost";
 let port = process.env.PORT;
 let img_path = path.join(appData, appName, "uploads", "/");
@@ -54,7 +69,32 @@ let auth_error = "Incorrect username or password";
 let auth_empty = "Please enter a username and password";
 let holdOrderlocation = $("#renderHoldOrders");
 let customerOrderLocation = $("#renderCustomerOrders");
-let storage = new Store();
+const storage =
+  desktop && desktop.store
+    ? desktop.store
+    : Store
+      ? new Store()
+      : {
+          get: () => undefined,
+          set: () => {},
+          delete: () => {},
+          clear: () => {},
+        };
+function desktopSend(channel, ...args) {
+  if (desktop && desktop.ipc && desktop.ipc.send) {
+    desktop.ipc.send(channel, ...args);
+  } else if (ipcRenderer) {
+    desktopSend(channel, ...args);
+  }
+}
+function desktopOn(channel, listener) {
+  if (desktop && desktop.ipc && desktop.ipc.on) {
+    return desktop.ipc.on(channel, listener);
+  }
+  if (ipcRenderer) {
+    ipcRenderer.on(channel, (event, ...args) => listener(...args));
+  }
+}
 let settings;
 let platform;
 let user = {};
@@ -442,7 +482,15 @@ if (token) {
 $(document).ajaxError(function (event, jqXHR) {
   if (jqXHR.status === 401) {
     storage.clear();
-    ipcRenderer.send("app-reload", "");
+    desktopSend("app-reload", "");
+    return;
+  }
+  if (
+    jqXHR.status === 403 &&
+    jqXHR.responseJSON &&
+    jqXHR.responseJSON.error === "PasswordChangeRequired"
+  ) {
+    $("#forcePasswordModal").modal("show");
   }
 });
 
@@ -453,7 +501,11 @@ if (auth == undefined) {
   authenticate();
 } else {
   $("#login").hide();
-  $("#main_app").show();
+  if (user && user.must_change_password) {
+    $("#forcePasswordModal").modal("show");
+  } else {
+    $("#main_app").show();
+  }
   platform = storage.get("settings");
 
   if (platform != undefined) {
@@ -1744,6 +1796,11 @@ if (auth == undefined) {
           }
         }
 
+        $("#is_active").prop(
+          "checked",
+          user.is_active === undefined || Number(user.is_active) === 1,
+        );
+
         $("#userModal").modal("show");
       });
     };
@@ -1877,8 +1934,12 @@ if (auth == undefined) {
           counter++;
           let safe_user_fullname = DOMPurify.sanitize(String(user.fullname || ""));
           let safe_user_username = DOMPurify.sanitize(String(user.username || ""));
+          const inactive =
+            user.is_active !== undefined && Number(user.is_active) === 0;
           user_list += `<tr>
-            <td>${safe_user_fullname}</td>
+            <td>${safe_user_fullname}${
+              inactive ? ' <span class="label label-danger">Inactive</span>' : ""
+            }</td>
             <td>${safe_user_username}</td>
             <td class="${class_name}">${
               state.length > 0 ? login_status : ""
@@ -2085,7 +2146,7 @@ if (auth == undefined) {
             storage.delete("auth");
             storage.delete("user");
             storage.delete("token");
-            ipcRenderer.send("app-reload", "");
+            desktopSend("app-reload", "");
           });
         },
       );
@@ -2137,7 +2198,7 @@ if (auth == undefined) {
         $(this).ajaxSubmit({
           contentType: "application/json",
           success: function () {
-            ipcRenderer.send("app-reload", "");
+            desktopSend("app-reload", "");
           },
           error: function (jqXHR) {
             console.error(jqXHR.responseJSON.message);
@@ -2165,7 +2226,7 @@ if (auth == undefined) {
         if (isNumeric(formData.till)) {
           formData["app"] = $("#app").find("option:selected").text();
           storage.set("settings", formData);
-          ipcRenderer.send("app-reload", "");
+          desktopSend("app-reload", "");
         } else {
           notiflix.Report.warning(
             "Oops!",
@@ -2179,6 +2240,7 @@ if (auth == undefined) {
     $("#saveUser").on("submit", function (e) {
       e.preventDefault();
       let formData = $(this).serializeObject();
+      formData.is_active = $("#is_active").is(":checked") ? 1 : 0;
 
       // Only enforce the match check when a new password was actually typed.
       // (An existing-user edit with an empty password field means "leave the
@@ -2199,7 +2261,7 @@ if (auth == undefined) {
         processData: false,
         success: function (data) {
           if (ownUserEdit) {
-            ipcRenderer.send("app-reload", "");
+            desktopSend("app-reload", "");
           } else {
             $("#userModal").modal("hide");
 
@@ -2909,21 +2971,58 @@ $("body").on("submit", "#account", function (e) {
           storage.set("user", data.user);
           storage.set("token", data.token);
           $.ajaxSetup({ headers: { "X-Access-Token": data.token } });
-          if (data.user && data.user.must_change_password) {
-            notiflix.Report.warning(
-              "Password Change Required",
-              "Please change your password immediately from your profile/settings.",
-              "Ok",
-            );
-          }
-          ipcRenderer.send("app-reload", "");
           $("#login").hide();
+          if (data.user && data.user.must_change_password) {
+            $("#forcePasswordModal").modal("show");
+            return;
+          }
+          desktopSend("app-reload", "");
+        } else if (data.error === "AccountInactive") {
+          notiflix.Report.warning(
+            "Account Inactive",
+            data.message || "This account has been deactivated.",
+            "Ok",
+          );
         } else {
           notiflix.Report.warning("Oops!", auth_error, "Ok");
         }
       },
     });
   }
+});
+
+$("#forcePasswordForm").on("submit", function (e) {
+  e.preventDefault();
+  const next = $("#force_new_password").val();
+  const confirm = $("#force_confirm_password").val();
+  if (!next || next.length < 6) {
+    notiflix.Notify.warning("Password must be at least 6 characters.");
+    return;
+  }
+  if (next !== confirm) {
+    notiflix.Notify.warning("Passwords do not match.");
+    return;
+  }
+  $.ajax({
+    url: api + "users/change-password",
+    type: "POST",
+    data: JSON.stringify({ new_password: next }),
+    contentType: "application/json; charset=utf-8",
+    success: function () {
+      const storedUser = storage.get("user") || {};
+      storedUser.must_change_password = false;
+      storage.set("user", storedUser);
+      $("#forcePasswordModal").modal("hide");
+      notiflix.Notify.success("Password updated.");
+      desktopSend("app-reload", "");
+    },
+    error: function (jqXHR) {
+      const msg =
+        (jqXHR.responseJSON && jqXHR.responseJSON.message) ||
+        "Failed to change password.";
+      notiflix.Notify.failure(msg);
+    },
+  });
 });
 
 $("#quit").on("click", function () {
@@ -2941,11 +3040,11 @@ $("#quit").on("click", function () {
     diagOptions.okButtonText,
     diagOptions.cancelButtonText,
     () => {
-      ipcRenderer.send("app-quit", "");
+      desktopSend("app-quit", "");
     },
   );
 });
 
-ipcRenderer.on("click-element", (event, elementId) => {
+desktopOn("click-element", (elementId) => {
   document.getElementById(elementId).click();
 });

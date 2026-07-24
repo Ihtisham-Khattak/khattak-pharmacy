@@ -8,8 +8,6 @@ const {
   handleClick,
   saveBackupDialog,
   restoreBackupDialog,
-  dbFolderPath,
-  uploadsFolderPath
 } = require("./menuController");
 const template = [
   ...(isMac
@@ -51,14 +49,14 @@ const template = [
           },
         ],
       },
-      { 
+      {
         label: "Backup",
-        click: ()=>saveBackupDialog(dbFolderPath,uploadsFolderPath)
-
+        click: () => saveBackupDialog(),
       },
-      { label: "Restore",
-      click: ()=>restoreBackupDialog(dbFolderPath,uploadsFolderPath)
-       },
+      {
+        label: "Restore",
+        click: () => restoreBackupDialog(),
+      },
       {
         label: "Logout",
         click: () => handleClick("log-out"),

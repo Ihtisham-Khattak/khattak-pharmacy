@@ -1397,6 +1397,12 @@
                     id="pass"
                   />
                 </div>
+                <div class="form-group">
+                  <span
+                    ><input type="checkbox" name="is_active" id="is_active" checked />
+                    Account active
+                  </span>
+                </div>
                 <div class="perms">
                   <h3 class="m-t-20">Permissions</h3>
                   <hr />
@@ -1455,6 +1461,53 @@
                   type="submit"
                   class="btn btn-primary btn-block waves-effect waves-light"
                 />
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        id="forcePasswordModal"
+        class="modal fade"
+        tabindex="-1"
+        role="dialog"
+        data-backdrop="static"
+        data-keyboard="false"
+        aria-hidden="true"
+      >
+        <div class="modal-dialog modal-sm">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h4 class="modal-title">Change Password Required</h4>
+            </div>
+            <div class="modal-body">
+              <p class="text-muted">
+                You must set a new password before using PharmaSpot.
+              </p>
+              <form id="forcePasswordForm">
+                <div class="form-group">
+                  <label>New Password</label>
+                  <input
+                    type="password"
+                    class="form-control"
+                    id="force_new_password"
+                    required
+                    minlength="6"
+                  />
+                </div>
+                <div class="form-group">
+                  <label>Confirm Password</label>
+                  <input
+                    type="password"
+                    class="form-control"
+                    id="force_confirm_password"
+                    required
+                    minlength="6"
+                  />
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                  Save Password
+                </button>
               </form>
             </div>
           </div>
