@@ -11,6 +11,7 @@
  */
 
 const request = require("supertest");
+const crypto = require("crypto");
 const { db, initDB } = require("../api/db");
 const { createSession, destroySession } = require("../api/middleware/auth");
 
@@ -42,8 +43,8 @@ function computeExpectedTotal(subtotal, discount) {
   return afterDiscount + taxAmount;
 }
 
-function newTxnId(suffix) {
-  return `TEST_TXN_${suffix}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+function newTxnId() {
+  return crypto.randomUUID();
 }
 
 function basePayload(overrides) {
@@ -66,7 +67,7 @@ describe("Transactions - financial integrity", () => {
 
     // Clean up any leftovers from a previous failed run.
     db.pragma("foreign_keys = OFF");
-    db.prepare("DELETE FROM transactions WHERE id LIKE ?").run("TEST_TXN_%");
+    db.prepare("DELETE FROM transactions WHERE user_id = ?").run(TEST_USER_ID);
     db.prepare("DELETE FROM inventory WHERE id = ?").run(TEST_PRODUCT_ID);
     db.prepare("DELETE FROM categories WHERE id = ?").run(TEST_CATEGORY_ID);
     db.prepare("DELETE FROM users WHERE id = ?").run(TEST_USER_ID);
@@ -111,7 +112,7 @@ describe("Transactions - financial integrity", () => {
   afterAll(() => {
     destroySession(token);
     db.pragma("foreign_keys = OFF");
-    db.prepare("DELETE FROM transactions WHERE id LIKE ?").run("TEST_TXN_%");
+    db.prepare("DELETE FROM transactions WHERE user_id = ?").run(TEST_USER_ID);
     db.prepare("DELETE FROM inventory WHERE id = ?").run(TEST_PRODUCT_ID);
     db.prepare("DELETE FROM categories WHERE id = ?").run(TEST_CATEGORY_ID);
     db.prepare("DELETE FROM users WHERE id = ?").run(TEST_USER_ID);
@@ -122,7 +123,7 @@ describe("Transactions - financial integrity", () => {
     const qty = 3;
     const subtotal = TEST_PRICE * qty;
     const expectedTotal = computeExpectedTotal(subtotal, 0);
-    const txnId = newTxnId("REAL_TOTAL");
+    const txnId = newTxnId();
 
     const res = await request(transactionsApp)
       .post("/new")
@@ -159,7 +160,7 @@ describe("Transactions - financial integrity", () => {
       .get(TEST_PRODUCT_ID).quantity;
 
     const oversellQty = beforeQty + 1000000;
-    const txnId = newTxnId("OVERSELL");
+    const txnId = newTxnId();
 
     const res = await request(transactionsApp)
       .post("/new")
@@ -201,7 +202,7 @@ describe("Transactions - financial integrity", () => {
       .prepare("SELECT quantity FROM inventory WHERE id = ?")
       .get(TEST_PRODUCT_ID).quantity;
     const subtotal = TEST_PRICE * qty;
-    const txnId = newTxnId("VOID");
+    const txnId = newTxnId();
 
     const saleRes = await request(transactionsApp)
       .post("/new")

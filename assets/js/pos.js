@@ -616,16 +616,24 @@ if (auth == undefined) {
         total_items += parseInt(data.quantity);
       });
       $("#total").text(total_items);
-      total = total - $("#inputDiscount").val();
+
+      let discountVal = parseFloat($("#inputDiscount").val());
+      if (isNaN(discountVal) || discountVal < 0) {
+        discountVal = 0;
+        $("#inputDiscount").val(0);
+      }
+      // Compare against pre-discount subtotal (previous bug wiped discounts ≥ ~50%).
+      if (discountVal >= total) {
+        $("#inputDiscount").val(0);
+        discountVal = 0;
+      }
+
+      total = total - discountVal;
       $("#price").text(
         validator.unescape(settings.symbol) + moneyFormat(total.toFixed(2)),
       );
 
       subTotal = total;
-
-      if ($("#inputDiscount").val() >= total) {
-        $("#inputDiscount").val(0);
-      }
 
       if (settings.charge_tax) {
         totalVat = (total * vat) / 100;
@@ -940,7 +948,7 @@ if (auth == undefined) {
           orderNumber = holdOrder;
           method = "PUT";
         } else {
-          orderNumber = Math.floor(Date.now() / 1000);
+          orderNumber = require("crypto").randomUUID();
           method = "POST";
         }
 
@@ -1098,11 +1106,13 @@ if (auth == undefined) {
           processData: false,
           success: function (data) {
             cart = [];
+            holdOrder = 0;
             receipt = DOMPurify.sanitize(receipt, {
               ALLOW_UNKNOWN_PROTOCOLS: true,
             });
             $("#viewTransaction").html("");
             $("#viewTransaction").html(receipt);
+            $("#voidTransactionBtn").hide();
             $("#orderModal").modal("show");
             loadProducts();
             $(".loading").hide();
@@ -1315,12 +1325,16 @@ if (auth == undefined) {
         holdOrder = order.id;
         cart = [];
         $.each(order.items || [], function (index, product) {
+          const qty = product.quantity || 1;
           item = {
             id: product.id || 0,
             product_name: product.product_name || "Unknown",
             sku: product.sku || "",
             price: product.price || 0,
-            quantity: product.quantity || 1,
+            quantity: qty,
+            // Hold already reserved stock; items are immutable on PUT — lock qty.
+            stock_quantity: qty,
+            stock: 1,
           };
           cart.push(item);
         });
@@ -1357,12 +1371,15 @@ if (auth == undefined) {
         holdOrder = order.id;
         cart = [];
         $.each(order.items || [], function (index, product) {
+          const qty = product.quantity || 1;
           item = {
             id: product.id || 0,
             product_name: product.product_name || "Unknown",
             sku: product.sku || "",
             price: product.price || 0,
-            quantity: product.quantity || 1,
+            quantity: qty,
+            stock_quantity: qty,
+            stock: 1,
           };
           cart.push(item);
         });
@@ -1381,44 +1398,34 @@ if (auth == undefined) {
           deleteId = customerOrderList[index].id;
       }
 
-      let data = {
-        orderId: deleteId,
-      };
-      let diagOptions = {
-        title: "Delete order?",
-        text: "This will delete the order. Are you sure you want to delete!",
-        icon: "warning",
-        showCancelButton: true,
-        okButtonColor: "#3085d6",
-        cancelButtonColor: "#d33",
-        okButtonText: "Yes, delete it!",
-        cancelButtonText: "Cancel",
-      };
-
       notiflix.Confirm.show(
-        diagOptions.title,
-        diagOptions.text,
-        diagOptions.okButtonText,
-        diagOptions.cancelButtonText,
+        "Cancel order?",
+        "This will cancel the order and restore stock. Continue?",
+        "Yes, cancel it",
+        "Keep order",
         () => {
           $.ajax({
-            url: api + "delete",
+            url: api + "void/" + deleteId,
             type: "POST",
-            data: JSON.stringify(data),
             contentType: "application/json; charset=utf-8",
             cache: false,
-            success: function (data) {
+            success: function () {
               $(this).getHoldOrders();
               $(this).getCustomerOrders();
 
               notiflix.Report.success(
-                "Deleted!",
-                "You have deleted the order!",
+                "Cancelled",
+                "The order was cancelled and stock restored.",
                 "Ok",
               );
             },
-            error: function (data) {
+            error: function (xhr) {
               $(".loading").hide();
+              let message = "Could not cancel the order.";
+              if (xhr.responseJSON && xhr.responseJSON.message) {
+                message = xhr.responseJSON.message;
+              }
+              notiflix.Report.failure("Cancel failed", message, "Ok");
             },
           });
         },
@@ -2643,7 +2650,71 @@ $.fn.viewTransaction = function (index) {
   $("#viewTransaction").html("");
   $("#viewTransaction").html(receipt);
 
+  const canVoid =
+    user &&
+    user.perm_transactions === 1 &&
+    allTransactions[index] &&
+    allTransactions[index].status !== -1 &&
+    allTransactions[index].status !== "-1";
+  if (canVoid) {
+    $("#voidTransactionBtn").show();
+  } else {
+    $("#voidTransactionBtn").hide();
+  }
+
   $("#orderModal").modal("show");
+};
+
+$.fn.voidCurrentTransaction = function () {
+  const txn = allTransactions[transaction_index];
+  if (!txn || txn.status === -1 || txn.status === "-1") {
+    return;
+  }
+  if (!user || user.perm_transactions !== 1) {
+    notiflix.Report.failure(
+      "Forbidden",
+      "You do not have permission to void sales.",
+      "Ok",
+    );
+    return;
+  }
+
+  notiflix.Confirm.show(
+    "Void sale?",
+    "This will void the sale and restore stock. This cannot be undone.",
+    "Yes, void it",
+    "Cancel",
+    () => {
+      $.ajax({
+        url: api + "void/" + txn.id,
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        cache: false,
+        success: function () {
+          $("#orderModal").modal("hide");
+          $("#voidTransactionBtn").hide();
+          notiflix.Report.success(
+            "Voided",
+            "Sale voided and stock restored.",
+            "Ok",
+          );
+          if (typeof loadTransactions === "function") {
+            loadTransactions();
+          }
+          if (typeof loadProducts === "function") {
+            loadProducts();
+          }
+        },
+        error: function (xhr) {
+          let message = "Could not void the sale.";
+          if (xhr.responseJSON && xhr.responseJSON.message) {
+            message = xhr.responseJSON.message;
+          }
+          notiflix.Report.failure("Void failed", message, "Ok");
+        },
+      });
+    },
+  );
 };
 
 $("#status").on("change", function () {

@@ -20,6 +20,9 @@ app.get("/", function (req, res) {
   res.send("Category API");
 });
 
+// All routes below this point require authentication.
+app.use(requireAuth);
+
 /**
  * GET endpoint: Get details of all categories.
  */
@@ -46,7 +49,7 @@ app.get("/all", function (req, res) {
  */
 app.get("/category/:categoryId", function (req, res) {
   if (!req.params.categoryId) {
-    res.status(500).send("ID missing");
+    res.status(400).send("ID missing");
   } else {
     try {
       const category = db
@@ -58,9 +61,6 @@ app.get("/category/:categoryId", function (req, res) {
     }
   }
 });
-
-// All routes below this point require authentication.
-app.use(requireAuth);
 
 /**
  * POST endpoint: Create a new category.

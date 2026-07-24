@@ -37,6 +37,11 @@ function migrateDatabase() {
 
 migrateDatabase();
 
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
 const db = new Database(dbPath);
 
 // Enable foreign key constraints - MUST be set on every connection
