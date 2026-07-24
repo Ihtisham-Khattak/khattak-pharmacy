@@ -10,9 +10,9 @@ const transactionsApp = require("../api/transactions");
 const outOfStockApp = require("../api/outOfStock");
 
 const TEST_PRICE = 10.0;
-const TEST_CATEGORY_ID = 900200001;
-const TEST_PRODUCT_ID = 900200002;
-const TEST_USER_ID = 900200003;
+const TEST_CATEGORY_ID = 900220001;
+const TEST_PRODUCT_ID = 900220002;
+const TEST_USER_ID = 900220003;
 const TEST_STARTING_QTY = 5;
 const TEST_MIN_STOCK = 3;
 
@@ -26,15 +26,19 @@ describe("Out of stock", () => {
   beforeAll(() => {
     initDB();
 
-    db.pragma("foreign_keys = OFF");
     db.prepare("DELETE FROM out_of_stock_products WHERE product_id = ?").run(
       TEST_PRODUCT_ID,
     );
+    db.prepare(
+      "DELETE FROM stock_movements WHERE ref_id IN (SELECT id FROM transactions WHERE user_id = ?)",
+    ).run(TEST_USER_ID);
+    db.prepare(
+      "DELETE FROM transaction_items WHERE transaction_id IN (SELECT id FROM transactions WHERE user_id = ?)",
+    ).run(TEST_USER_ID);
     db.prepare("DELETE FROM transactions WHERE user_id = ?").run(TEST_USER_ID);
     db.prepare("DELETE FROM inventory WHERE id = ?").run(TEST_PRODUCT_ID);
     db.prepare("DELETE FROM categories WHERE id = ?").run(TEST_CATEGORY_ID);
     db.prepare("DELETE FROM users WHERE id = ?").run(TEST_USER_ID);
-    db.pragma("foreign_keys = ON");
 
     db.prepare("INSERT INTO categories (id, name) VALUES (?, ?)").run(
       TEST_CATEGORY_ID,
@@ -90,15 +94,19 @@ describe("Out of stock", () => {
 
   afterAll(() => {
     if (token) destroySession(token);
-    db.pragma("foreign_keys = OFF");
     db.prepare("DELETE FROM out_of_stock_products WHERE product_id = ?").run(
       TEST_PRODUCT_ID,
     );
+    db.prepare(
+      "DELETE FROM stock_movements WHERE ref_id IN (SELECT id FROM transactions WHERE user_id = ?)",
+    ).run(TEST_USER_ID);
+    db.prepare(
+      "DELETE FROM transaction_items WHERE transaction_id IN (SELECT id FROM transactions WHERE user_id = ?)",
+    ).run(TEST_USER_ID);
     db.prepare("DELETE FROM transactions WHERE user_id = ?").run(TEST_USER_ID);
     db.prepare("DELETE FROM inventory WHERE id = ?").run(TEST_PRODUCT_ID);
     db.prepare("DELETE FROM categories WHERE id = ?").run(TEST_CATEGORY_ID);
     db.prepare("DELETE FROM users WHERE id = ?").run(TEST_USER_ID);
-    db.pragma("foreign_keys = ON");
   });
 
   test("void sale removes product from OOS list after stock restore", async () => {

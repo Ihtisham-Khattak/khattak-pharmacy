@@ -4,6 +4,10 @@ const crypto = require("crypto");
 const moment = require("moment");
 const Inventory = require("./inventory");
 const { db, ensureForeignKeysEnabled } = require("./db");
+const {
+  writeTransactionItems,
+  recordStockMovementsForItems,
+} = require("./schemaHelpers");
 const { requireAuth, requirePermission } = require("./middleware/auth");
 
 const EXPIRY_DATE_FORMAT = "DD-MMM-YYYY";
@@ -145,6 +149,13 @@ function voidTransactionById(id) {
           Inventory.syncOutOfStock(db, productId);
         }
       }
+      recordStockMovementsForItems(db, items, {
+        reason: "void",
+        refType: "transaction",
+        refId: id,
+        userId: existing.user_id,
+        sign: 1,
+      });
     }
     voidStmt.run(id);
   });
@@ -592,8 +603,18 @@ app.post("/new", function (req, res) {
         finalTax,
       );
 
+      writeTransactionItems(db, txnId, t.items);
+
       console.log('[transactions] About to decrement inventory with items:', JSON.stringify(t.items));
       Inventory.decrementInventory(t.items);
+
+      recordStockMovementsForItems(db, t.items, {
+        reason: isHold ? "hold_reserve" : "sale",
+        refType: "transaction",
+        refId: txnId,
+        userId: parseInt(t.user_id),
+        sign: -1,
+      });
     });
 
     try {

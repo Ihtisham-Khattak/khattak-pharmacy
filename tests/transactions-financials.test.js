@@ -66,12 +66,16 @@ describe("Transactions - financial integrity", () => {
     initDB();
 
     // Clean up any leftovers from a previous failed run.
-    db.pragma("foreign_keys = OFF");
+    db.prepare(
+      "DELETE FROM stock_movements WHERE ref_id IN (SELECT id FROM transactions WHERE user_id = ?)",
+    ).run(TEST_USER_ID);
+    db.prepare(
+      "DELETE FROM transaction_items WHERE transaction_id IN (SELECT id FROM transactions WHERE user_id = ?)",
+    ).run(TEST_USER_ID);
     db.prepare("DELETE FROM transactions WHERE user_id = ?").run(TEST_USER_ID);
     db.prepare("DELETE FROM inventory WHERE id = ?").run(TEST_PRODUCT_ID);
     db.prepare("DELETE FROM categories WHERE id = ?").run(TEST_CATEGORY_ID);
     db.prepare("DELETE FROM users WHERE id = ?").run(TEST_USER_ID);
-    db.pragma("foreign_keys = ON");
 
     db.prepare("INSERT INTO categories (id, name) VALUES (?, ?)").run(
       TEST_CATEGORY_ID,
@@ -111,12 +115,16 @@ describe("Transactions - financial integrity", () => {
 
   afterAll(() => {
     destroySession(token);
-    db.pragma("foreign_keys = OFF");
+    db.prepare(
+      "DELETE FROM stock_movements WHERE ref_id IN (SELECT id FROM transactions WHERE user_id = ?)",
+    ).run(TEST_USER_ID);
+    db.prepare(
+      "DELETE FROM transaction_items WHERE transaction_id IN (SELECT id FROM transactions WHERE user_id = ?)",
+    ).run(TEST_USER_ID);
     db.prepare("DELETE FROM transactions WHERE user_id = ?").run(TEST_USER_ID);
     db.prepare("DELETE FROM inventory WHERE id = ?").run(TEST_PRODUCT_ID);
     db.prepare("DELETE FROM categories WHERE id = ?").run(TEST_CATEGORY_ID);
     db.prepare("DELETE FROM users WHERE id = ?").run(TEST_USER_ID);
-    db.pragma("foreign_keys = ON");
   });
 
   test("POST /new stores the server-recomputed total, not a client-understated total", async () => {

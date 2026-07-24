@@ -54,6 +54,20 @@ function ensureForeignKeysEnabled() {
 // Enable FK on module load
 ensureForeignKeysEnabled();
 
+try {
+  db.pragma("journal_mode = WAL");
+} catch (err) {
+  console.error("Failed to set journal_mode=WAL:", err.message);
+}
+
+try {
+  db.pragma("busy_timeout = 5000");
+} catch (err) {
+  console.error("Failed to set busy_timeout=5000:", err.message);
+}
+
+const TARGET_SCHEMA_VERSION = 2;
+
 // Ensure FK is enabled before every prepare/exec operation
 const originalPrepare = db.prepare.bind(db);
 const originalExec = db.exec.bind(db);
@@ -211,6 +225,7 @@ function initDB() {
   addColumnIfMissing("settings", "allow_lan_access", "INTEGER DEFAULT 0");
   addColumnIfMissing("transactions", "hold_customer_name", "TEXT DEFAULT ''");
   addColumnIfMissing("transactions", "hold_customer_phone", "TEXT DEFAULT ''");
+  addColumnIfMissing("users", "is_active", "INTEGER DEFAULT 1");
   try {
     db.exec(
       "CREATE INDEX IF NOT EXISTS idx_transactions_ref_number ON transactions(ref_number)",
@@ -219,7 +234,113 @@ function initDB() {
     console.error("Migration failed: idx_transactions_ref_number:", err.message);
   }
 
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS transaction_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transaction_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE RESTRICT,
+        product_id INTEGER,
+        product_name TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        unit_price REAL NOT NULL,
+        line_total REAL NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ti_txn ON transaction_items(transaction_id);
+      CREATE INDEX IF NOT EXISTS idx_ti_product ON transaction_items(product_id);
+
+      CREATE TABLE IF NOT EXISTS stock_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        qty_delta INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        ref_type TEXT,
+        ref_id TEXT,
+        user_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_sm_product ON stock_movements(product_id);
+      CREATE INDEX IF NOT EXISTS idx_sm_ref ON stock_movements(ref_type, ref_id);
+
+      CREATE TABLE IF NOT EXISTS customer_accounts (
+        customer_id INTEGER PRIMARY KEY REFERENCES customers(id),
+        balance REAL NOT NULL DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS ledger_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_id INTEGER REFERENCES customers(id),
+        entry_type TEXT NOT NULL,
+        amount REAL NOT NULL,
+        transaction_id TEXT,
+        note TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        user_id INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_le_customer ON ledger_entries(customer_id);
+      CREATE INDEX IF NOT EXISTS idx_le_txn ON ledger_entries(transaction_id);
+    `);
+  } catch (err) {
+    console.error("Migration failed: dual-write schema tables:", err.message);
+  }
+
+  backfillTransactionItems();
+
+  const currentVersion = db.pragma("user_version", { simple: true });
+  if (currentVersion < TARGET_SCHEMA_VERSION) {
+    db.pragma(`user_version = ${TARGET_SCHEMA_VERSION}`);
+  }
+
   console.log("Database initialized successfully at:", dbPath);
+}
+
+/**
+ * Backfill transaction_items from legacy transactions.items JSON.
+ * Idempotent: skips transactions that already have normalized rows.
+ */
+function backfillTransactionItems() {
+  let txns;
+  try {
+    txns = db
+      .prepare(
+        `
+        SELECT t.id, t.items FROM transactions t
+        WHERE t.items IS NOT NULL AND t.items != ''
+        AND NOT EXISTS (
+          SELECT 1 FROM transaction_items ti WHERE ti.transaction_id = t.id
+        )
+      `,
+      )
+      .all();
+  } catch (err) {
+    console.error("Backfill failed: could not query transactions:", err.message);
+    return;
+  }
+
+  const insertStmt = db.prepare(`
+    INSERT INTO transaction_items (transaction_id, product_id, product_name, quantity, unit_price, line_total)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const txn of txns) {
+    let items;
+    try {
+      items = JSON.parse(txn.items);
+    } catch (e) {
+      continue;
+    }
+    if (!Array.isArray(items)) continue;
+
+    for (const item of items) {
+      const productId = parseInt(item.id, 10);
+      const qty = parseFloat(item.quantity) || 0;
+      const price = parseFloat(item.price) || 0;
+      if (isNaN(productId) || qty <= 0) continue;
+      const productName =
+        item.product_name != null ? String(item.product_name) : "";
+      insertStmt.run(txn.id, productId, productName, qty, price, qty * price);
+    }
+  }
 }
 
 /**
@@ -247,4 +368,5 @@ module.exports = {
   initDB,
   dbPath,
   ensureForeignKeysEnabled,
+  TARGET_SCHEMA_VERSION,
 };

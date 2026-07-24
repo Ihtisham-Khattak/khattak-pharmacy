@@ -51,7 +51,10 @@ describe("Transactions - Wave 1", () => {
   beforeAll(() => {
     initDB();
 
-    db.pragma("foreign_keys = OFF");
+    db.prepare("DELETE FROM transaction_items WHERE transaction_id LIKE ?").run(
+      "TEST_W1_%",
+    );
+    db.prepare("DELETE FROM stock_movements WHERE ref_id LIKE ?").run("TEST_W1_%");
     db.prepare("DELETE FROM transactions WHERE id LIKE ?").run("TEST_W1_%");
     db.prepare("DELETE FROM inventory WHERE id IN (?, ?)").run(
       TEST_PRODUCT_ID,
@@ -62,7 +65,6 @@ describe("Transactions - Wave 1", () => {
       TEST_USER_ID,
       TEST_OTHER_USER_ID,
     );
-    db.pragma("foreign_keys = ON");
 
     db.prepare("INSERT INTO categories (id, name) VALUES (?, ?)").run(
       TEST_CATEGORY_ID,
@@ -167,8 +169,20 @@ describe("Transactions - Wave 1", () => {
   afterAll(() => {
     destroySession(adminToken);
     destroySession(cashierToken);
-    db.pragma("foreign_keys = OFF");
-    db.prepare("DELETE FROM transactions WHERE id LIKE ?").run("%900200%");
+    const txnIds = db
+      .prepare(
+        "SELECT id FROM transactions WHERE user_id IN (?, ?)",
+      )
+      .all(TEST_USER_ID, TEST_OTHER_USER_ID)
+      .map((r) => r.id);
+    for (const id of txnIds) {
+      db.prepare("DELETE FROM transaction_items WHERE transaction_id = ?").run(
+        id,
+      );
+      db.prepare(
+        "DELETE FROM stock_movements WHERE ref_type = ? AND ref_id = ?",
+      ).run("transaction", id);
+    }
     db.prepare(
       "DELETE FROM transactions WHERE user_id IN (?, ?)",
     ).run(TEST_USER_ID, TEST_OTHER_USER_ID);
@@ -181,7 +195,6 @@ describe("Transactions - Wave 1", () => {
       TEST_USER_ID,
       TEST_OTHER_USER_ID,
     );
-    db.pragma("foreign_keys = ON");
   });
 
   test("POST /new allows hold (status 0) with paid 0", async () => {

@@ -67,6 +67,7 @@ express.use("/api/categories", require("./api/categories"));
 express.use("/api/settings", require("./api/settings"));
 express.use("/api/users", require("./api/users"));
 express.use("/api/out-of-stock", require("./api/outOfStock"));
+express.use("/api/ledger", require("./api/ledger"));
 express.use("/api", require("./api/transactions"));
 
 const bindHost = getBindHost();
