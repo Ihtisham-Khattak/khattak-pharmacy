@@ -22,6 +22,55 @@ function isProductExpired(expirationDate) {
   return moment().startOf("day").isSameOrAfter(expiry.startOf("day"));
 }
 
+function sanitizeHoldContact(t, isHold) {
+  const name = t.hold_customer_name != null ? String(t.hold_customer_name).trim() : "";
+  const phone = t.hold_customer_phone != null ? String(t.hold_customer_phone).trim() : "";
+
+  if (!isHold) {
+    return { holdCustomerName: name, holdCustomerPhone: phone };
+  }
+
+  if (!name) {
+    return {
+      error: {
+        status: 400,
+        body: {
+          error: "Customer Required",
+          message: "Customer name is required for hold orders.",
+        },
+      },
+    };
+  }
+
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 7 || digits.length > 15) {
+    return {
+      error: {
+        status: 400,
+        body: {
+          error: "Invalid Phone",
+          message: "Enter a valid phone number (7–15 digits).",
+        },
+      },
+    };
+  }
+
+  const ref = t.ref_number != null ? String(t.ref_number).trim() : "";
+  if (!ref) {
+    return {
+      error: {
+        status: 400,
+        body: {
+          error: "Reference Required",
+          message: "Hold orders require a reference number.",
+        },
+      },
+    };
+  }
+
+  return { holdCustomerName: name.slice(0, 80), holdCustomerPhone: phone.slice(0, 20) };
+}
+
 function resolveTransactionId(t) {
   const candidate =
     t._id != null && t._id !== ""
@@ -488,6 +537,12 @@ app.post("/new", function (req, res) {
 
     const status = parseInt(t.status, 10);
     const isHold = status === 0;
+    const contact = sanitizeHoldContact(t, isHold);
+    if (contact.error) {
+      return res.status(contact.error.status).json(contact.error.body);
+    }
+    const { holdCustomerName, holdCustomerPhone } = contact;
+
     const paid = parseFloat(t.paid) || 0;
     // Hold orders park the cart unpaid; only completed sales require payment.
     if (!isHold && paid < finalTotal - FLOAT_TOLERANCE) {
@@ -505,8 +560,8 @@ app.post("/new", function (req, res) {
 
     const insertStmt = db.prepare(
       `
-      INSERT INTO transactions (id, date, user_id, till, status, total, paid, change, customer_id, ref_number, items, payment_type, discount, tax)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO transactions (id, date, user_id, till, status, total, paid, change, customer_id, ref_number, hold_customer_name, hold_customer_phone, items, payment_type, discount, tax)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     );
 
@@ -526,6 +581,8 @@ app.post("/new", function (req, res) {
         change,
         customerId,
         t.ref_number || "",
+        holdCustomerName,
+        holdCustomerPhone,
         JSON.stringify(t.items),
         t.payment_type || "Cash",
         discount,
@@ -633,6 +690,24 @@ app.put("/new", function (req, res) {
     const { discount, taxAmount, authoritativeTotal } = totals;
 
     const isHold = nextStatus === 0;
+    // Preserve hold contact when completing a recalled hold via payment.
+    if (existing.status === 0) {
+      if (!t.hold_customer_name) {
+        t.hold_customer_name = existing.hold_customer_name || "";
+      }
+      if (!t.hold_customer_phone) {
+        t.hold_customer_phone = existing.hold_customer_phone || "";
+      }
+      if (!t.ref_number) {
+        t.ref_number = existing.ref_number || "";
+      }
+    }
+    const contact = sanitizeHoldContact(t, isHold);
+    if (contact.error) {
+      return res.status(contact.error.status).json(contact.error.body);
+    }
+    const { holdCustomerName, holdCustomerPhone } = contact;
+
     const paid = parseFloat(t.paid) || 0;
     if (!isHold && paid < authoritativeTotal - FLOAT_TOLERANCE) {
       return res.status(400).json({
@@ -652,7 +727,9 @@ app.put("/new", function (req, res) {
         UPDATE transactions SET
           date = ?, user_id = ?, till = ?, status = ?,
           total = ?, paid = ?, change = ?,
-          customer_id = ?, ref_number = ?, items = ?,
+          customer_id = ?, ref_number = ?,
+          hold_customer_name = ?, hold_customer_phone = ?,
+          items = ?,
           payment_type = ?, discount = ?, tax = ?
         WHERE id = ?
       `,
@@ -666,6 +743,8 @@ app.put("/new", function (req, res) {
         change,
         customerId,
         t.ref_number || "",
+        holdCustomerName,
+        holdCustomerPhone,
         JSON.stringify(t.items),
         t.payment_type || "Cash",
         discount,

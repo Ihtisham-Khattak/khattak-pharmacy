@@ -675,7 +675,7 @@
         aria-labelledby="mySmallModalLabel"
         aria-hidden="true"
       >
-        <div class="modal-dialog modal-sm">
+        <div class="modal-dialog modal-md">
           <div class="modal-content">
             <div class="modal-header">
               <button
@@ -689,132 +689,44 @@
               <h4 class="modal-title" id="mySmallModalLabel">Hold Order</h4>
             </div>
             <div class="modal-body">
-              <form action="">
+              <div class="form-group">
+                <label for="refNumber">Reference Number</label>
                 <input
                   type="text"
                   id="refNumber"
-                  placeholder="Enter a reference"
                   class="form-control"
+                  readonly
+                  placeholder="Auto-generated"
                 />
-              </form>
-              <hr />
-              <div class="row">
-                <div class="col-md-4">
-                  <button
-                    data-val="1"
-                    data-isdue="true"
-                    class="btn btn-success btn-lg btn-block keypad-btn"
-                  >
-                    1
-                  </button>
-                </div>
-                <div class="col-md-4">
-                  <button
-                    data-val="2"
-                    data-isdue="true"
-                    class="btn btn-success btn-lg btn-block keypad-btn"
-                  >
-                    2
-                  </button>
-                </div>
-                <div class="col-md-4">
-                  <button
-                    data-val="3"
-                    data-isdue="true"
-                    class="btn btn-success btn-lg btn-block keypad-btn"
-                  >
-                    3
-                  </button>
-                </div>
+                <p class="help-block m-b-0">
+                  Generated automatically and cannot be edited.
+                </p>
               </div>
-              <br />
-              <div class="row">
-                <div class="col-md-4">
-                  <button
-                    data-val="4"
-                    data-isdue="true"
-                    class="btn btn-success btn-lg btn-block keypad-btn"
-                  >
-                    4
-                  </button>
-                </div>
-                <div class="col-md-4">
-                  <button
-                    data-val="5"
-                    data-isdue="true"
-                    class="btn btn-success btn-lg btn-block keypad-btn"
-                  >
-                    5
-                  </button>
-                </div>
-                <div class="col-md-4">
-                  <button
-                    data-val="6"
-                    data-isdue="true"
-                    class="btn btn-success btn-lg btn-block keypad-btn"
-                  >
-                    6
-                  </button>
-                </div>
+              <div class="form-group">
+                <label for="holdCustomerName">Customer Name*</label>
+                <input
+                  type="text"
+                  id="holdCustomerName"
+                  class="form-control"
+                  placeholder="Customer name"
+                  maxlength="80"
+                  autocomplete="name"
+                />
               </div>
-              <br />
-              <div class="row">
-                <div class="col-md-4">
-                  <button
-                    data-val="7"
-                    data-isdue="true"
-                    class="btn btn-success btn-lg btn-block keypad-btn"
-                  >
-                    7
-                  </button>
-                </div>
-                <div class="col-md-4">
-                  <button
-                    data-val="8"
-                    data-isdue="true"
-                    class="btn btn-success btn-lg btn-block keypad-btn"
-                  >
-                    8
-                  </button>
-                </div>
-                <div class="col-md-4">
-                  <button
-                    data-val="9"
-                    data-isdue="true"
-                    class="btn btn-success btn-lg btn-block keypad-btn"
-                  >
-                    9
-                  </button>
-                </div>
+              <div class="form-group">
+                <label for="holdCustomerPhone">Customer Phone*</label>
+                <input
+                  type="tel"
+                  id="holdCustomerPhone"
+                  class="form-control"
+                  placeholder="e.g. 03001234567"
+                  maxlength="20"
+                  autocomplete="tel"
+                />
               </div>
-              <br />
-              <div class="row">
-                <div class="col-md-4">
-                  <button
-                    data-val="del"
-                    class="btn btn-warning btn-lg btn-block"
-                  >
-                    ⌫
-                  </button>
-                </div>
-                <div class="col-md-4">
-                  <button
-                    data-val="0"
-                    data-isdue="true"
-                    class="btn btn-success btn-lg btn-block keypad-btn"
-                  >
-                    0
-                  </button>
-                </div>
-                <div class="col-md-4">
-                  <button
-                    data-val="ac"
-                    data-isdue="true"
-                    class="btn btn-danger btn-lg btn-block keypad-btn"
-                  >
-                    AC
-                  </button>
-                </div>
+              <div class="alert alert-info m-b-0">
+                Hold total:
+                <strong id="holdOrderTotal">0.00</strong>
               </div>
             </div>
             <div class="modal-footer">

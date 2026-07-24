@@ -13,6 +13,7 @@ let dotInterval = setInterval(function () {
   $(".dot").text(".");
 }, 3000);
 let Store = require("electron-store");
+const crypto = require("crypto");
 const remote = require("@electron/remote");
 const app = remote.app;
 let cart = [];
@@ -210,6 +211,39 @@ function populateProductCategoryFilter() {
   });
   $filter.html(options);
   $filter.val(current);
+}
+
+function generateHoldRef() {
+  const day = moment().format("YYYYMMDD");
+  const rand = crypto.randomBytes(2).toString("hex").toUpperCase();
+  return `HOLD-${day}-${rand}`;
+}
+
+function isValidHoldPhone(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  return digits.length >= 7 && digits.length <= 15;
+}
+
+function formatMoneyAmount(value) {
+  const num = parseFloat(value);
+  if (isNaN(num)) return "0.00";
+  return moneyFormat(num.toFixed(2));
+}
+
+function updateHoldOrderTotalDisplay() {
+  const symbol =
+    settings && settings.symbol
+      ? validator.unescape(String(settings.symbol))
+      : "";
+  const total = orderTotal || "0.00";
+  $("#holdOrderTotal").text(symbol + formatMoneyAmount(total));
+}
+
+function clearHoldFormFields() {
+  $("#refNumber").val("");
+  $("#holdCustomerName").val("");
+  $("#holdCustomerPhone").val("");
+  $("#holdOrderTotal").text("0.00");
 }
 
 //set the content security policy of the app
@@ -853,7 +887,16 @@ if (auth == undefined) {
 
     $("#hold").on("click", function () {
       if (cart.length != 0) {
-        $("#dueModal").modal("toggle");
+        $(this).calculateCart();
+        if (!holdOrder) {
+          $("#refNumber").val(generateHoldRef());
+          $("#holdCustomerName").val("");
+          $("#holdCustomerPhone").val("");
+        } else if (!$("#refNumber").val()) {
+          $("#refNumber").val(generateHoldRef());
+        }
+        updateHoldOrderTotalDisplay();
+        $("#dueModal").modal("show");
       } else {
         notiflix.Report.warning("Oops!", "There is nothing to hold!", "Ok");
       }
@@ -888,13 +931,28 @@ if (auth == undefined) {
           return;
         }
 
-        // Fix #4: Move reference validation before any processing (for hold orders)
+        // Hold orders: validate auto-ref + customer contact
         if (status == 0) {
           let refNumber = $("#refNumber").val() || "";
           if (refNumber.trim() === "") {
+            $("#refNumber").val(generateHoldRef());
+            refNumber = $("#refNumber").val();
+          }
+          const customerName = ($("#holdCustomerName").val() || "").trim();
+          const customerPhone = ($("#holdCustomerPhone").val() || "").trim();
+          if (!customerName) {
             notiflix.Report.warning(
-              "Reference Required!",
-              "You need to enter a reference for hold orders!",
+              "Customer Required",
+              "Enter the customer name for this hold order.",
+              "Ok",
+            );
+            $("#confirmPayment").prop("disabled", false);
+            return;
+          }
+          if (!isValidHoldPhone(customerPhone)) {
+            notiflix.Report.warning(
+              "Invalid Phone",
+              "Enter a valid phone number (7–15 digits).",
               "Ok",
             );
             $("#confirmPayment").prop("disabled", false);
@@ -1127,6 +1185,8 @@ if (auth == undefined) {
         let data = {
           order: orderNumber,
           ref_number: refNumber,
+          hold_customer_name: ($("#holdCustomerName").val() || "").trim(),
+          hold_customer_phone: ($("#holdCustomerPhone").val() || "").trim(),
           discount: discount,
           customer: customer,
           status: status,
@@ -1171,7 +1231,7 @@ if (auth == undefined) {
             $("#dueModal button").prop("disabled", false);
             $("#confirmPayment").prop("disabled", false);
             // Clear form fields on success
-            $("#refNumber").val("");
+            clearHoldFormFields();
             $("#change").text("");
             $("#payment,#paymentText").val("");
             $("#dueModal").modal("hide");
@@ -1258,26 +1318,47 @@ if (auth == undefined) {
 
     $.fn.renderHoldOrders = function (data, renderLocation, orderType) {
       $.each(data, function (index, order) {
-        $.fn.calculatePrice(order);
+        const symbol =
+          settings && settings.symbol
+            ? validator.unescape(String(settings.symbol))
+            : "";
+        const totalDisplay = symbol + formatMoneyAmount(order.total);
+        const customerName = DOMPurify.sanitize(
+          String(order.hold_customer_name || "Walk-in customer"),
+        );
+        const customerPhone = DOMPurify.sanitize(
+          String(order.hold_customer_phone || ""),
+        );
 
-        // Fix #7: Handle customer object properly (may be JSON string, object, or null)
-        let customerName = "Walk in customer";
-        try {
-          if (order.customer) {
-            // If customer is a JSON string, parse it
-            if (typeof order.customer === "string") {
-              let parsed = JSON.parse(order.customer);
-              customerName = parsed.name || "Walk in customer";
-            } else if (
-              typeof order.customer === "object" &&
-              order.customer.name
-            ) {
-              customerName = order.customer.name;
-            }
-          }
-        } catch (e) {
-          console.warn("Error parsing customer data:", e);
-          customerName = "Walk in customer";
+        const details = $("<p>").append(
+          $("<b>", { text: "Ref :" }),
+          $("<span>", {
+            text: order.ref_number || "N/A",
+            class: "ref_number",
+          }),
+          $("<br>"),
+          $("<b>", { text: "Price :" }),
+          $("<span>", {
+            text: totalDisplay,
+            class: "label label-info",
+            style: "font-size:14px;",
+          }),
+          $("<br>"),
+          $("<b>", { text: "Items :" }),
+          $("<span>", { text: order.items ? order.items.length : 0 }),
+          $("<br>"),
+          $("<b>", { text: "Customer :" }),
+          $("<span>", {
+            text: customerName,
+            class: "customer_name",
+          }),
+        );
+        if (customerPhone) {
+          details.append(
+            $("<br>"),
+            $("<b>", { text: "Phone :" }),
+            $("<span>", { text: customerPhone }),
+          );
         }
 
         renderLocation.append(
@@ -1287,29 +1368,7 @@ if (auth == undefined) {
           }).append(
             $("<a>").append(
               $("<div>", { class: "card-box order-box" }).append(
-                $("<p>").append(
-                  $("<b>", { text: "Ref :" }),
-                  $("<span>", {
-                    text: order.ref_number || "N/A",
-                    class: "ref_number",
-                  }),
-                  $("<br>"),
-                  $("<b>", { text: "Price :" }),
-                  $("<span>", {
-                    text: order.total || "0.00",
-                    class: "label label-info",
-                    style: "font-size:14px;",
-                  }),
-                  $("<br>"),
-                  $("<b>", { text: "Items :" }),
-                  $("<span>", { text: order.items ? order.items.length : 0 }),
-                  $("<br>"),
-                  $("<b>", { text: "Customer :" }),
-                  $("<span>", {
-                    text: customerName,
-                    class: "customer_name",
-                  }),
-                ),
+                details,
                 $("<button>", {
                   class: "btn btn-danger del",
                   onclick:
@@ -1334,44 +1393,20 @@ if (auth == undefined) {
         price += product.price * product.quantity;
       });
 
-      let vat = (price * data.vat) / 100;
-      totalPrice = (price + vat - data.discount).toFixed(0);
+      let vat = ((price * (data.vat || 0)) / 100) || 0;
+      totalPrice = (price + vat - (data.discount || 0)).toFixed(2);
 
       return totalPrice;
     };
 
     $.fn.orderDetails = function (index, orderType) {
-      $("#refNumber").val("");
+      clearHoldFormFields();
 
       if (orderType == 1) {
         let order = holdOrderList[index];
-        $("#refNumber").val(order.ref_number || "");
-
-        // Fix #7: Handle customer data properly
-        let customerName = "Walk in customer";
-        try {
-          if (order.customer) {
-            if (typeof order.customer === "string") {
-              let parsed = JSON.parse(order.customer);
-              customerName = parsed.name || "Walk in customer";
-            } else if (
-              typeof order.customer === "object" &&
-              order.customer.name
-            ) {
-              customerName = order.customer.name;
-            }
-          }
-        } catch (e) {
-          console.warn("Error parsing customer data:", e);
-        }
-
-        // CUSTOMER DROPDOWN - COMMENTED OUT
-        // $("#customer option:selected").removeAttr("selected");
-        // $("#customer option")
-        //   .filter(function () {
-        //     return $(this).text() == customerName;
-        //   })
-        //   .prop("selected", true);
+        $("#refNumber").val(order.ref_number || generateHoldRef());
+        $("#holdCustomerName").val(order.hold_customer_name || "");
+        $("#holdCustomerPhone").val(order.hold_customer_phone || "");
 
         holdOrder = order.id;
         cart = [];
@@ -1391,33 +1426,11 @@ if (auth == undefined) {
         });
       } else if (orderType == 2) {
         let order = customerOrderList[index];
-        $("#refNumber").val("");
-
-        // Fix #7: Handle customer data properly for customer orders
-        let customerName = "Walk in customer";
-        try {
-          if (order.customer) {
-            if (typeof order.customer === "string") {
-              let parsed = JSON.parse(order.customer);
-              customerName = parsed.name || "Walk in customer";
-            } else if (
-              typeof order.customer === "object" &&
-              order.customer.name
-            ) {
-              customerName = order.customer.name;
-            }
-          }
-        } catch (e) {
-          console.warn("Error parsing customer data:", e);
-        }
+        $("#refNumber").val(order.ref_number || "");
+        $("#holdCustomerName").val(order.hold_customer_name || "");
+        $("#holdCustomerPhone").val(order.hold_customer_phone || "");
 
         $("#customer option:selected").removeAttr("selected");
-
-        $("#customer option")
-          .filter(function () {
-            return $(this).text() == customerName;
-          })
-          .prop("selected", true);
 
         holdOrder = order.id;
         cart = [];
@@ -1436,6 +1449,7 @@ if (auth == undefined) {
         });
       }
       $(this).renderTable(cart);
+      updateHoldOrderTotalDisplay();
       $("#holdOrdersModal").modal("hide");
       $("#customerModal").modal("hide");
     };

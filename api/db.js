@@ -147,6 +147,8 @@ function initDB() {
       change REAL DEFAULT 0,
       customer_id INTEGER DEFAULT 0,
       ref_number TEXT,
+      hold_customer_name TEXT DEFAULT '',
+      hold_customer_phone TEXT DEFAULT '',
       items TEXT,
       payment_type TEXT,
       discount REAL DEFAULT 0,
@@ -207,6 +209,15 @@ function initDB() {
   // PRAGMA table_info() first and only ALTER when the column is missing.
   addColumnIfMissing("users", "must_change_password", "INTEGER DEFAULT 0");
   addColumnIfMissing("settings", "allow_lan_access", "INTEGER DEFAULT 0");
+  addColumnIfMissing("transactions", "hold_customer_name", "TEXT DEFAULT ''");
+  addColumnIfMissing("transactions", "hold_customer_phone", "TEXT DEFAULT ''");
+  try {
+    db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_transactions_ref_number ON transactions(ref_number)",
+    );
+  } catch (err) {
+    console.error("Migration failed: idx_transactions_ref_number:", err.message);
+  }
 
   console.log("Database initialized successfully at:", dbPath);
 }

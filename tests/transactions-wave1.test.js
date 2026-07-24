@@ -197,6 +197,8 @@ describe("Transactions - Wave 1", () => {
         basePayload({
           status: 0,
           ref_number: "HOLD-W1-1",
+          hold_customer_name: "Test Customer",
+          hold_customer_phone: "03001234567",
           items: itemsPayload(TEST_PRODUCT_ID, qty),
           total: TEST_PRICE * qty,
           paid: 0,
@@ -250,6 +252,8 @@ describe("Transactions - Wave 1", () => {
         basePayload({
           status: 0,
           ref_number: "HOLD-W1-VOID",
+          hold_customer_name: "Void Customer",
+          hold_customer_phone: "03007654321",
           items: itemsPayload(TEST_PRODUCT_ID, qty),
           total: TEST_PRICE * qty,
           paid: 0,
@@ -346,6 +350,8 @@ describe("Transactions - Wave 1", () => {
         basePayload({
           status: 0,
           ref_number: "HOLD-W1-PAY",
+          hold_customer_name: "Pay Customer",
+          hold_customer_phone: "03001112222",
           items: itemsPayload(TEST_PRODUCT_ID, qty),
           total: TEST_PRICE * qty,
           paid: 0,
@@ -364,6 +370,8 @@ describe("Transactions - Wave 1", () => {
           id: txnId,
           status: 1,
           ref_number: "HOLD-W1-PAY",
+          hold_customer_name: "Pay Customer",
+          hold_customer_phone: "03001112222",
           items,
           total: TEST_PRICE * qty,
           paid: 1000,
