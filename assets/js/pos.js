@@ -246,6 +246,71 @@ function clearHoldFormFields() {
   $("#holdOrderTotal").text("0.00");
 }
 
+const CART_DRAFT_KEY = "pos_draft_cart";
+
+function persistCartState() {
+  try {
+    if (!storage) return;
+    if (!cart || cart.length === 0) {
+      storage.delete(CART_DRAFT_KEY);
+      return;
+    }
+    storage.set(CART_DRAFT_KEY, {
+      cart: cart,
+      holdOrder: holdOrder || 0,
+      discount: $("#inputDiscount").val() || "0",
+      updatedAt: Date.now(),
+    });
+  } catch (err) {
+    console.error("Failed to persist cart:", err);
+  }
+}
+
+function clearPersistedCart() {
+  try {
+    if (storage) storage.delete(CART_DRAFT_KEY);
+  } catch (err) {
+    console.error("Failed to clear persisted cart:", err);
+  }
+}
+
+function restorePersistedCart() {
+  try {
+    if (!storage) return false;
+    const saved = storage.get(CART_DRAFT_KEY);
+    if (!saved || !Array.isArray(saved.cart) || saved.cart.length === 0) {
+      return false;
+    }
+    cart = saved.cart
+      .filter((item) => item && item.id != null)
+      .map((item) => ({
+        id: item.id,
+        product_name: item.product_name || "Unknown",
+        sku: item.sku || "",
+        price: parseFloat(item.price) || 0,
+        quantity: Math.max(1, parseInt(item.quantity, 10) || 1),
+        stock_quantity:
+          item.stock_quantity != null
+            ? parseInt(item.stock_quantity, 10)
+            : undefined,
+        stock: item.stock != null ? item.stock : 1,
+      }));
+    if (!cart.length) {
+      clearPersistedCart();
+      return false;
+    }
+    holdOrder = saved.holdOrder || 0;
+    if (saved.discount != null) {
+      $("#inputDiscount").val(saved.discount);
+    }
+    $.fn.renderTable(cart);
+    return true;
+  } catch (err) {
+    console.error("Failed to restore cart:", err);
+    return false;
+  }
+}
+
 //set the content security policy of the app
 setContentSecurityPolicy();
 
@@ -419,6 +484,10 @@ if (auth == undefined) {
 
     loadCategories();
     loadProducts();
+    // Restore in-progress cart after settings/user are available.
+    setTimeout(function () {
+      restorePersistedCart();
+    }, 400);
 
     window.__paginationHandlers = {
       loadProducts: function (p) {
@@ -740,30 +809,38 @@ if (auth == undefined) {
       $(this).calculateCart();
       $.each(cartList, function (index, data) {
         $("#cartTable .card-body").append(
-          $("<div>", { class: "row m-t-10 align-items-center" }).append(
+          $("<div>", { class: "row m-t-10 align-items-center cart-line" }).append(
             $("<div>", { class: "col-xs-1", text: index + 1 }),
-            $("<div>", { class: "col-xs-4", text: data.product_name }),
+            $("<div>", {
+              class: "col-xs-4 cart-item-name",
+              text: data.product_name,
+            }),
             $("<div>", { class: "col-xs-3" }).append(
               $("<div>", { class: "input-group input-group-sm" }).append(
                 $("<span>", { class: "input-group-btn" }).append(
                   $("<button>", {
                     class: "btn btn-light",
+                    type: "button",
+                    title: "Decrease quantity",
                     onclick: "$(this).qtDecrement(" + index + ")",
-                  }).append($("i", { class: "fa fa-minus" })),
+                  }).append($("<i>", { class: "fa fa-minus" })),
                 ),
                 $("<input>", {
                   class: "num-qty form-control text-center",
-                  type: "text",
-                  readonly: "",
-                  value: data.quantity,
+                  type: "number",
                   min: "1",
-                  onInput: "$(this).qtInput(" + index + ")",
+                  step: "1",
+                  value: data.quantity,
+                  "data-index": index,
+                  title: "Type quantity and press Enter",
                 }),
                 $("<span>", { class: "input-group-btn" }).append(
                   $("<button>", {
                     class: "btn btn-light",
+                    type: "button",
+                    title: "Increase quantity",
                     onclick: "$(this).qtIncrement(" + index + ")",
-                  }).append($("i", { class: "fa fa-plus" })),
+                  }).append($("<i>", { class: "fa fa-plus" })),
                 ),
               ),
             ),
@@ -776,17 +853,43 @@ if (auth == undefined) {
             $("<div>", { class: "col-xs-1 text-right" }).append(
               $("<button>", {
                 class: "btn btn-light btn-xs",
+                type: "button",
+                title: "Remove item",
                 onclick: "$(this).deleteFromCart(" + index + ")",
-              }).append($("i", { class: "fa fa-times" })),
+              }).append($("<i>", { class: "fa fa-times" })),
             ),
           ),
         );
       });
+      persistCartState();
     };
+
+    $(document)
+      .off("change.cartQty keydown.cartQty", "#cartTable .num-qty")
+      .on("change.cartQty", "#cartTable .num-qty", function () {
+        const i = parseInt($(this).data("index"), 10);
+        if (!isNaN(i)) {
+          $(this).qtInput(i);
+        }
+      })
+      .on("keydown.cartQty", "#cartTable .num-qty", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          $(this).trigger("change");
+          $(this).blur();
+        }
+      });
+
+    $("#inputDiscount")
+      .off("change.cartPersist input.cartPersist")
+      .on("change.cartPersist", function () {
+        persistCartState();
+      });
 
     $.fn.deleteFromCart = function (index) {
       cart.splice(index, 1);
       $(this).renderTable(cart);
+      if (!cart.length) clearPersistedCart();
     };
 
     $.fn.qtIncrement = function (i) {
@@ -863,8 +966,9 @@ if (auth == undefined) {
           diagOptions.cancelButtonText,
           () => {
             cart = [];
-            $(this).renderTable(cart);
             holdOrder = 0;
+            $(this).renderTable(cart);
+            clearPersistedCart();
             notiflix.Report.success(
               "Cleared!",
               "All items have been removed.",
@@ -1218,6 +1322,7 @@ if (auth == undefined) {
           success: function (data) {
             cart = [];
             holdOrder = 0;
+            clearPersistedCart();
             receipt = DOMPurify.sanitize(receipt, {
               ALLOW_UNKNOWN_PROTOCOLS: true,
             });

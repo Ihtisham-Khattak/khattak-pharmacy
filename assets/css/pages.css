@@ -49,6 +49,21 @@
   overflow-x: auto;
 }
 
+#cartTable .num-qty {
+  max-width: 72px;
+  -moz-appearance: textfield;
+}
+
+#cartTable .num-qty::-webkit-outer-spin-button,
+#cartTable .num-qty::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+#cartTable .cart-item-name {
+  word-break: break-word;
+}
+
 @media (min-width: 768px) {
   .mgmt-toolbar .form-control {
     margin-bottom: 0;
