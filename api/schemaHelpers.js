@@ -19,7 +19,61 @@ function writeTransactionItems(db, transactionId, items) {
     if (isNaN(productId) || qty <= 0) continue;
     const productName =
       item.product_name != null ? String(item.product_name) : "";
-    insertStmt.run(transactionId, productId, productName, qty, price, qty * price);
+    insertStmt.run(
+      transactionId,
+      productId,
+      productName,
+      qty,
+      price,
+      qty * price,
+    );
+  }
+}
+
+/**
+ * Prefer normalized transaction_items rows; fall back to legacy JSON blob.
+ * Returns cart-shaped objects: { id, product_name, quantity, price }.
+ */
+function readTransactionItems(db, transactionRow) {
+  if (!transactionRow || !transactionRow.id) {
+    return [];
+  }
+
+  try {
+    const rows = db
+      .prepare(
+        `
+        SELECT product_id, product_name, quantity, unit_price
+        FROM transaction_items
+        WHERE transaction_id = ?
+        ORDER BY id ASC
+      `,
+      )
+      .all(transactionRow.id);
+
+    if (rows && rows.length > 0) {
+      return rows.map((row) => ({
+        id: row.product_id,
+        product_name: row.product_name,
+        quantity: row.quantity,
+        price: row.unit_price,
+      }));
+    }
+  } catch (err) {
+    // Table may be mid-migration; fall through to JSON.
+  }
+
+  if (transactionRow.items == null || transactionRow.items === "") {
+    return [];
+  }
+  if (Array.isArray(transactionRow.items)) {
+    return transactionRow.items;
+  }
+  try {
+    const parsed = JSON.parse(transactionRow.items);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
   }
 }
 
@@ -66,6 +120,7 @@ function recordStockMovementsForItems(
 
 module.exports = {
   writeTransactionItems,
+  readTransactionItems,
   recordStockMovement,
   recordStockMovementsForItems,
 };

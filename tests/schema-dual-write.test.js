@@ -264,4 +264,45 @@ describe("Schema dual-write", () => {
     expect(paymentEntry).toBeDefined();
     expect(paymentEntry.amount).toBeCloseTo(-20, 2);
   });
+
+  test("GET /:id prefers normalized transaction_items over JSON blob", async () => {
+    const qty = 1;
+    const txnId = newTxnId();
+
+    const saleRes = await request(transactionsApp)
+      .post("/new")
+      .set("X-Access-Token", token)
+      .send(
+        basePayload({
+          _id: txnId,
+          id: txnId,
+          items: [
+            {
+              id: TEST_PRODUCT_ID,
+              product_name: "TEST Dual-Write Product",
+              quantity: qty,
+              price: TEST_PRICE,
+            },
+          ],
+          total: TEST_PRICE * qty,
+          paid: 1000,
+        }),
+      );
+    expect(saleRes.status).toBe(200);
+
+    // Corrupt legacy JSON so a JSON-only reader would fail / return wrong data.
+    db.prepare("UPDATE transactions SET items = ? WHERE id = ?").run(
+      JSON.stringify([{ id: 1, product_name: "STALE", quantity: 99, price: 1 }]),
+      txnId,
+    );
+
+    const getRes = await request(transactionsApp)
+      .get(`/${txnId}`)
+      .set("X-Access-Token", token);
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.items).toHaveLength(1);
+    expect(getRes.body.items[0].id).toBe(TEST_PRODUCT_ID);
+    expect(getRes.body.items[0].quantity).toBe(qty);
+    expect(getRes.body.items[0].product_name).toBe("TEST Dual-Write Product");
+  });
 });

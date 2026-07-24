@@ -6,6 +6,7 @@ const Inventory = require("./inventory");
 const { db, ensureForeignKeysEnabled } = require("./db");
 const {
   writeTransactionItems,
+  readTransactionItems,
   recordStockMovementsForItems,
 } = require("./schemaHelpers");
 const { requireAuth, requirePermission } = require("./middleware/auth");
@@ -119,12 +120,7 @@ function voidTransactionById(id) {
     };
   }
 
-  let items;
-  try {
-    items = JSON.parse(existing.items);
-  } catch (e) {
-    items = [];
-  }
+  let items = readTransactionItems(db, existing);
 
   const incrementStmt = db.prepare(
     "UPDATE inventory SET quantity = quantity + ? WHERE id = ?",
@@ -211,7 +207,7 @@ app.get("/all", requirePermission("perm_transactions"), function (req, res) {
     // Parse items JSON for each transaction
     const formatted = transactions.map((t) => ({
       ...t,
-      items: JSON.parse(t.items),
+      items: readTransactionItems(db, t),
     }));
     res.send(formatted);
   } catch (err) {
@@ -231,7 +227,7 @@ app.get("/on-hold", function (req, res) {
       .all();
     const formatted = transactions.map((t) => ({
       ...t,
-      items: JSON.parse(t.items),
+      items: readTransactionItems(db, t),
     }));
     res.send(formatted);
   } catch (err) {
@@ -251,7 +247,7 @@ app.get("/customer-orders", function (req, res) {
       .all();
     const formatted = transactions.map((t) => ({
       ...t,
-      items: JSON.parse(t.items),
+      items: readTransactionItems(db, t),
     }));
     res.send(formatted);
   } catch (err) {
@@ -281,7 +277,7 @@ app.get("/by-date", requirePermission("perm_transactions"), function (req, res) 
     const transactions = db.prepare(query).all(...params);
     const formatted = transactions.map((t) => ({
       ...t,
-      items: JSON.parse(t.items),
+      items: readTransactionItems(db, t),
     }));
     res.send(formatted);
   } catch (err) {
@@ -687,12 +683,7 @@ app.put("/new", function (req, res) {
     }
 
     // Items must not change on update - see LIMITATION above.
-    let existingItems;
-    try {
-      existingItems = JSON.parse(existing.items);
-    } catch (e) {
-      existingItems = existing.items;
-    }
+    const existingItems = readTransactionItems(db, existing);
     if (JSON.stringify(existingItems) !== JSON.stringify(t.items)) {
       return res.status(400).json({
         error: "Items Changed",
@@ -889,7 +880,7 @@ app.get("/:transactionId", function (req, res) {
       .prepare("SELECT * FROM transactions WHERE id = ?")
       .get(req.params.transactionId);
     if (t) {
-      res.send({ ...t, items: JSON.parse(t.items) });
+      res.send({ ...t, items: readTransactionItems(db, t) });
     } else {
       res.send(null);
     }

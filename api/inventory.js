@@ -3,6 +3,7 @@ const bodyParser = require("body-parser");
 const validator = require("validator");
 const { db, ensureForeignKeysEnabled } = require("./db");
 const { requireAuth, requirePermission } = require("./middleware/auth");
+const { recordStockMovement } = require("./schemaHelpers");
 
 app.use(bodyParser.json());
 
@@ -180,9 +181,23 @@ app.post("/product", requirePermission("perm_products"), function (req, res) {
           form,
         );
       const newId = result.lastInsertRowid;
+      if (quantity !== 0) {
+        recordStockMovement(db, {
+          productId: newId,
+          qtyDelta: quantity,
+          reason: "adjust",
+          refType: "inventory",
+          refId: String(newId),
+          userId: req.user && req.user.id,
+        });
+      }
       syncOutOfStock(db, newId);
       res.sendStatus(200);
     } else {
+      const productId = parseInt(id, 10);
+      const previous = db
+        .prepare("SELECT quantity FROM inventory WHERE id = ?")
+        .get(productId);
       db.prepare(
         `
         UPDATE inventory SET 
@@ -202,9 +217,21 @@ app.post("/product", requirePermission("perm_products"), function (req, res) {
         stock,
         strength,
         form,
-        parseInt(id),
+        productId,
       );
-      syncOutOfStock(db, parseInt(id));
+      const prevQty = previous ? previous.quantity : 0;
+      const delta = quantity - prevQty;
+      if (delta !== 0) {
+        recordStockMovement(db, {
+          productId,
+          qtyDelta: delta,
+          reason: "adjust",
+          refType: "inventory",
+          refId: String(productId),
+          userId: req.user && req.user.id,
+        });
+      }
+      syncOutOfStock(db, productId);
       res.sendStatus(200);
     }
   } catch (err) {
